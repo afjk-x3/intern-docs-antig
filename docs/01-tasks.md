@@ -23,38 +23,38 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 1 — Identity & Access (Week 2, FR-1, FR-2, FR-3)
 
-- [ ] Supabase Auth via `@supabase/ssr`, invitation-only, self-registration disabled
-- [ ] Invitation flow: admin invites email + role, 7-day expiry, 12-char minimum password on acceptance
-- [ ] Role assignment: exactly one role per user at signup, role change writes to `audit_log`
-- [ ] RLS policies for `users`, scoped so an intern cannot read another intern's row
-- [ ] Internship date entry (self-entry at first login), editable until first approval, then admin-only, end date > start date and within 12 months, changes audit-logged
-- [ ] Adversarial test: intern requests another intern's submission id directly via API → 403/404, never data (first entries in FR-26 suite)
-- [ ] Session idle timeout at 60 minutes (NFR security)
+- [x] Supabase Auth via `@supabase/ssr`, invitation-only, self-registration disabled
+- [x] Invitation flow: admin invites email + role, 7-day expiry, 12-char minimum password on acceptance
+- [x] Role assignment: exactly one role per user at signup, role change writes to `audit_log`
+- [x] RLS policies for `users`, scoped so an intern cannot read another intern's row
+- [x] Internship date entry (self-entry at first login), editable until first approval, then admin-only, end date > start date and within 12 months, changes audit-logged
+- [x] Adversarial test: intern requests another intern's submission id directly via API → 403/404, never data (first entries in FR-26 suite)
+- [x] Session idle timeout at 60 minutes (NFR security)
 
 ## Phase 2 — Requirements & Submission, Unsigned (Weeks 3–4, FR-4 to FR-8, FR-13)
 
-- [ ] Admin CRUD for requirement definitions: name, description, accepted types, max size, due date (fixed or relative), optional template file, routing template
-- [ ] Seed requirement types: Evaluation Paper, Daily Time Record
-- [ ] Publish requirement → visible to every intern within 5 seconds; editing does not alter already-approved submissions (version the requirement definition)
-- [ ] Intern checklist page (landing page after login): every requirement in one of the 8 defined states, due date, days remaining
-- [ ] Upload flow: PDF/PNG/JPEG, 20 MB max, magic-byte validation (not extension), specific rejection reasons
-- [ ] On successful upload: submission → `SUBMITTED`, version 1 sealed with SHA-256, approver notified, no public URLs ever issued
-- [ ] Re-upload after return: creates version n+1, marks n superseded, never overwrites, returns to step 1, prior versions and comments stay visible to submitter and admins
-- [ ] Routing template CRUD: 1–2 sequential steps, role or named user, optional SLA in working days, editable without deploy, editing creates a new revision, in-flight submissions keep their starting revision
-- [ ] Server-side transition guard: every transition validated against Appendix A; illegal transition → 409 + audit entry; no direct client write can change state
-- [ ] End-to-end manual check: a real DTR moves from upload to unsigned approval on staging
+- [x] Admin CRUD for requirement definitions: name, description, accepted types, max size, due date (fixed or relative), optional template file, routing template
+- [x] Seed requirement types: Evaluation Paper, Daily Time Record
+- [x] Publish requirement → visible to every intern within 5 seconds; editing does not alter already-approved submissions (version the requirement definition)
+- [x] Intern checklist page (landing page after login): every requirement in one of the 8 defined states, due date, days remaining
+- [x] Upload flow: PDF/PNG/JPEG, 20 MB max, magic-byte validation (not extension), specific rejection reasons
+- [x] On successful upload: submission → `SUBMITTED`, version 1 sealed with SHA-256, approver notified, no public URLs ever issued
+- [x] Re-upload after return: creates version n+1, marks n superseded, never overwrites, returns to step 1, prior versions and comments stay visible to submitter and admins
+- [x] Routing template CRUD: 1–2 sequential steps, role or named user, optional SLA in working days, editable without deploy, editing creates a new revision, in-flight submissions keep their starting revision
+- [x] Server-side transition guard: every transition validated against Appendix A; illegal transition → 409 + audit entry; no direct client write can change state
+- [x] End-to-end manual check: a real DTR moves from upload to unsigned approval on staging
 
 ## Phase 3 — Signature (Week 5, FR-9, FR-11, FR-14)
 
-- [ ] Signature enrollment: canvas draw or PNG upload (transparent, <2 MB), stored in a bucket with no client-readable policy
-- [ ] Block first approval until a signature is enrolled; prompt at that point
-- [ ] Server-side compositing with pdf-lib: signature image + printed name + approval date placed at the requirement's configured position; signature image never sent to the browser during this operation
-- [ ] Signed output stored as new immutable artefact; original submitted version stays unmodified
-- [ ] Approval writes: approver id, UTC timestamp, step number, version approved, SHA-256 of that version
-- [ ] Guard rails: cannot approve a step not assigned to you, cannot approve the same step twice, explicit confirmation required
-- [ ] Freeze rule: after final approval, no role but the retention job can replace or delete either artefact
-- [ ] Download recomputes SHA-256 and warns on mismatch
-- [ ] Approver reassignment (FR-15): available on any in-review submission, reason required, both approvers notified, original loses access immediately, new approver's own signature applies
+- [x] Signature enrollment: canvas draw or PNG upload (transparent, <2 MB), stored in a bucket with no client-readable policy
+- [x] Block first approval until a signature is enrolled; prompt at that point
+- [x] Server-side compositing with pdf-lib: signature image + printed name + approval date placed at the requirement's configured position; signature image never sent to the browser during this operation
+- [x] Signed output stored as new immutable artefact; original submitted version stays unmodified
+- [x] Approval writes: approver id, UTC timestamp, step number, version approved, SHA-256 of that version
+- [x] Guard rails: cannot approve a step not assigned to you, cannot approve the same step twice, explicit confirmation required
+- [x] Freeze rule: after final approval, no role but the retention job can replace or delete either artefact
+- [x] Download recomputes SHA-256 and warns on mismatch
+- [x] Approver reassignment (FR-15): available on any in-review submission, reason required, both approvers notified, original loses access immediately, new approver's own signature applies
 
 ## Phase 4 — Retention, Notifications, Admin (Week 6, FR-16 to FR-24)
 

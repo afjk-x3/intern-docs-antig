@@ -1,14 +1,82 @@
-export default function InternDashboard() {
+import { getInternChecklist, uploadSubmission, resubmitSubmission, getSubmissionSignedDownloadUrl } from '@lib/data/submissions';
+import { createClient } from '@lib/supabase/server';
+import { InternChecklist } from '@/components/InternChecklist';
+import { redirect } from 'next/navigation';
+
+export default async function InternDashboard() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const items = await getInternChecklist();
+
+  async function handleUpload(formData: FormData) {
+    'use server';
+    try {
+      await uploadSubmission(formData);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Upload failed';
+      return { error: msg };
+    }
+  }
+
+  async function handleResubmit(formData: FormData) {
+    'use server';
+    try {
+      await resubmitSubmission(formData);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Re-upload failed';
+      return { error: msg };
+    }
+  }
+
+  async function handleGetDownloadUrl(submissionId: string) {
+    'use server';
+    try {
+      const res = await getSubmissionSignedDownloadUrl(submissionId);
+      return { signedUrl: res.signedUrl, isVerified: res.isVerified, fileHash: res.fileHash };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch download link';
+      return { error: msg };
+    }
+  }
+
   return (
-    <div className="min-h-screen p-8 bg-surface-muted">
-      <div className="max-w-2xl mx-auto bg-surface-bg p-6 rounded-lg shadow border border-border-default">
-        <h1 className="text-2xl font-bold text-text-primary">Intern Dashboard</h1>
-        <div className="mt-8 flex flex-col items-center justify-center py-12 text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-text-muted text-sm">No submissions yet. Your requirement checklist will appear here once configured by your administrator.</p>
+    <div className="min-h-screen p-6 md:p-10 bg-surface-muted">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white font-bold">
+              ID
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-text-primary">InternDocs</h1>
+              <p className="text-xs text-text-muted">Makerspace Document Submission & Tracking</p>
+            </div>
+          </div>
+
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="text-xs text-text-muted hover:text-text-primary font-medium px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
+
+        <InternChecklist
+          items={items}
+          internEmail={user.email}
+          onUploadAction={handleUpload}
+          onResubmitAction={handleResubmit}
+          onGetDownloadUrlAction={handleGetDownloadUrl}
+        />
       </div>
     </div>
   );
