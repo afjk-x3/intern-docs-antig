@@ -1,6 +1,30 @@
 # InternDocs — Design Spec
 
-Three surfaces, one per persona. Build against `07-design-system.md` for tokens and components. Accessibility target on every surface: WCAG 2.1 AA, keyboard-operable, 4.5:1 contrast minimum for body text, usable at 360px width.
+## 0. Navigation Shell (applies to every surface below)
+
+Every authenticated screen lives inside a persistent app shell, not a standalone page. The shell differs by role, since navigation needs differ by role.
+
+**Admin — sidebar.** Admin has the most sections and will keep growing (Phase 4 adds the audit log and exports). A left sidebar, not a top nav, since a horizontal nav with 5+ items gets cramped. Sidebar sections, in order:
+- Dashboard (completion matrix)
+- Requirements
+- Routing Templates
+- Users (invitations, role management)
+- Audit Log
+- Retention & Deletions (Phase 4: post-deletion approval record view)
+
+Sidebar shows the current admin's name and a sign-out action at the bottom. Active section is visually distinct (brand-colored indicator, not just bold text).
+
+**Approver — sidebar**, same shell pattern as admin for consistency, fewer items:
+- Queue
+- Signature Settings
+
+**Intern — top header, not a sidebar.** Intern has one real destination (the checklist), a sidebar would be mostly empty space. Header shows product name, the intern's name, days remaining in internship, and sign-out. No nav items needed beyond the logo linking back to the checklist.
+
+All three shells share the same design tokens (`07-design-system.md`), just different structural chrome. Mobile: sidebar collapses to a hamburger-triggered drawer below 768px; the intern header stays as-is since it's already minimal.
+
+---
+
+
 
 Design principles from the PRD, apply everywhere:
 - Status is legible at a glance

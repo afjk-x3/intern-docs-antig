@@ -162,12 +162,12 @@ export function SignaturePad({
                 Last updated:{' '}
                 {lastUpdatedAt
                   ? new Date(lastUpdatedAt).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
                   : 'N/A'}
               </p>
             </div>
@@ -205,18 +205,16 @@ export function SignaturePad({
             <button
               type="button"
               onClick={() => { setMode('canvas'); setErrorMsg(null); }}
-              className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                mode === 'canvas' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
-              }`}
+              className={`px-3 py-1 rounded-md font-semibold transition-colors ${mode === 'canvas' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                }`}
             >
               Draw
             </button>
             <button
               type="button"
               onClick={() => { setMode('upload'); setErrorMsg(null); }}
-              className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                mode === 'upload' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
-              }`}
+              className={`px-3 py-1 rounded-md font-semibold transition-colors ${mode === 'upload' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
+                }`}
             >
               Upload PNG
             </button>
