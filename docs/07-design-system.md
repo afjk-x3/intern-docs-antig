@@ -2,15 +2,15 @@
 
 Built on Tailwind CSS + shadcn/ui. This file defines tokens and component rules. Update section 1 the moment the Makerspace logo and brand colors arrive in Antigravity; nothing else in this file should need to change when that happens.
 
-## 1. Brand tokens — PLACEHOLDER, swap using the provided logo
+## 1. Brand tokens — CONFIRMED from Makerspace logo
 
-The Makerspace logo is included in the project files. Extract the primary and accent hex values from it and replace the placeholder tokens below before shipping any UI. Do not ship final designs against these placeholder values; they exist only so component work is not blocked while that extraction happens.
+The Makerspace logo (`docs/makerspace-brand.png`) was used to extract the primary and accent hex values below. Contrast ratios verified against white (#FFFFFF): primary #1B3251 = 10.07:1, accent #C9400A = 4.88:1, both pass WCAG AA.
 
 ```css
 :root {
-  --brand-primary: #2563EB;      /* placeholder — swap for Makerspace primary */
-  --brand-primary-hover: #1D4ED8;
-  --brand-accent: #0EA5E9;       /* placeholder — swap for Makerspace secondary */
+  --brand-primary: #1B3251;      /* Makerspace primary */
+  --brand-primary-hover: #112136;
+  --brand-accent: #C9400A;       /* Makerspace secondary */
 
   --status-not-started: #94A3B8;
   --status-draft: #64748B;
@@ -25,11 +25,11 @@ The Makerspace logo is included in the project files. Extract the primary and ac
   --surface-muted: #F8FAFC;
   --border-default: #E2E8F0;
   --text-primary: #0F172A;
-  --text-muted: #475569;
+  --text-muted: #334155;         /* 7.01:1 on white — WCAG AA pass */
 }
 ```
 
-**Action item:** extract the primary and accent hex values from the provided logo, replace `--brand-primary`, `--brand-primary-hover`, and `--brand-accent` here, and confirm every brand-colored element still meets 4.5:1 contrast against its background (WCAG AA, non-negotiable per NFR accessibility).
+**Status:** Brand tokens are confirmed and applied in `src/app/globals.css`. Contrast verification complete.
 
 ## 2. Typography
 

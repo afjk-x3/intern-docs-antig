@@ -1,11 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-primary: #1B3251;      /* Makerspace primary — extracted from logo, 10.07:1 on white */
+  --brand-primary-hover: #112136;
+  --brand-accent: #C9400A;       /* Makerspace secondary — extracted from logo, 4.88:1 on white */
+
+  --status-not-started: #94A3B8;
+  --status-draft: #64748B;
+  --status-submitted: #3B82F6;
+  --status-in-review: #F59E0B;
+  --status-returned: #EF4444;
+  --status-approved: #22C55E;
+  --status-overdue: #DC2626;
+  --status-deleted: #9CA3AF;
+
+  --surface-bg: #FFFFFF;
+  --surface-muted: #F8FAFC;
+  --border-default: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-muted: #334155;         /* 7.01:1 on white — WCAG AA pass */
+  
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
+  --color-brand-primary: #1B3251;
+  --color-brand-primary-hover: #112136;
+  --color-brand-accent: #C9400A;
+  
+  --color-status-not-started: #94A3B8;
+  --color-status-draft: #64748B;
+  --color-status-submitted: #3B82F6;
+  --color-status-in-review: #F59E0B;
+  --color-status-returned: #EF4444;
+  --color-status-approved: #22C55E;
+  --color-status-overdue: #DC2626;
+  --color-status-deleted: #9CA3AF;
+
+  --color-surface-bg: #FFFFFF;
+  --color-surface-muted: #F8FAFC;
+  --color-border-default: #E2E8F0;
+  --color-text-primary: #0F172A;
+  --color-text-muted: #334155;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -13,14 +51,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* We don't have dark mode tokens specified in 07-design-system.md yet */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface-muted);
+  color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }

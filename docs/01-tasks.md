@@ -10,16 +10,16 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 0 — Foundation (Week 1)
 
-- [ ] Initialize Next.js 16 repo, TypeScript strict mode, ESLint, Prettier
-- [ ] Set up Supabase project (dev), link CLI, configure migrations folder
-- [ ] Write initial schema migration: `users`, `roles`, `requirements`, `routing_templates`, `submissions`, `submission_versions`, `approvals`, `audit_log`, `notifications`
-- [ ] Enable RLS on every table at creation time, deny-by-default policies (no table ships without a policy — see `12-backend-security-rules.md`)
-- [ ] Create server-only data-access layer (`lib/data/*`, `import 'server-only'`) before any UI touches the database
-- [ ] Configure CI: lint, typecheck, unit tests, pre-commit secret scan, block merge on failure
+- [x] Initialize Next.js 16 repo, TypeScript strict mode, ESLint, Prettier
+- [x] Set up Supabase project (dev), link CLI, configure migrations folder
+- [x] Write initial schema migration: `users`, `roles`, `requirements`, `routing_templates`, `submissions`, `submission_versions`, `approvals`, `audit_log`, `notifications`
+- [x] Enable RLS on every table at creation time, deny-by-default policies (no table ships without a policy — see `12-backend-security-rules.md`)
+- [x] Create server-only data-access layer (`lib/data/*`, `import 'server-only'`) before any UI touches the database
+- [x] Configure CI: lint, typecheck, unit tests, pre-commit secret scan, block merge on failure
 - [ ] Set up staging environment on Vercel + Supabase
-- [ ] Encode the state machine from Appendix A as a typed, server-side state table (single source of truth, no ad-hoc status strings — Risk R6)
-- [ ] Write `.env.example`; confirm no secrets are committed
-- [ ] Apply placeholder brand tokens from `07-design-system.md` (swap when logo arrives)
+- [x] Encode the state machine from Appendix A as a typed, server-side state table (single source of truth, no ad-hoc status strings — Risk R6)
+- [x] Write `.env.example`; confirm no secrets are committed
+- [x] Apply placeholder brand tokens from `07-design-system.md` (swap when logo arrives)
 
 ## Phase 1 — Identity & Access (Week 2, FR-1, FR-2, FR-3)
 

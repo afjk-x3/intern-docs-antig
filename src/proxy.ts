@@ -1,0 +1,86 @@
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
+
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+
+export async function proxy(request: NextRequest) {
+  const supabaseResponse = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Idle timeout logic
+  const now = Date.now();
+  const lastActiveStr = request.cookies.get('last_active')?.value;
+  
+  if (user) {
+    if (lastActiveStr) {
+      const lastActive = parseInt(lastActiveStr, 10);
+      if (now - lastActive > IDLE_TIMEOUT_MS) {
+        // Sign out due to inactivity
+        await supabase.auth.signOut();
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = '/login';
+        redirectUrl.searchParams.set('reason', 'timeout');
+        const response = NextResponse.redirect(redirectUrl);
+        response.cookies.delete('last_active');
+        return response;
+      }
+    }
+    
+    // Update last_active
+    supabaseResponse.cookies.set('last_active', now.toString(), {
+      path: '/',
+      maxAge: 60 * 60, // 60 minutes
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+  }
+
+  // Protection logic
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/accept-invite');
+  
+  if (!user && !isAuthRoute) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/login';
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && isAuthRoute) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/'; // Dashboard
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  return supabaseResponse;
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};
