@@ -42,44 +42,65 @@ export const StateMachine: Record<SubmissionState, Partial<Record<Action, Transi
     CANCEL: { to: SubmissionState.CANCELLED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.SUBMITTED]: {
-    ASSIGN_STEP: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.SYSTEM_ADMIN] }, // Triggered by system
-    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    ASSIGN_STEP: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
+    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.IN_REVIEW]: {
-    APPROVE_INTERMEDIATE: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.APPROVER] },
-    APPROVE_FINAL: { to: SubmissionState.APPROVED, allowedRoles: [UserRole.APPROVER] },
-    RETURN: { to: SubmissionState.RETURNED, allowedRoles: [UserRole.APPROVER] },
+    APPROVE_INTERMEDIATE: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
+    APPROVE_FINAL: { to: SubmissionState.APPROVED, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
+    RETURN: { to: SubmissionState.RETURNED, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
     REASSIGN: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
-    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.RETURNED]: {
     RESUBMIT: { to: SubmissionState.SUBMITTED, allowedRoles: [UserRole.INTERN] },
     CANCEL: { to: SubmissionState.CANCELLED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
-    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.APPROVED]: {
-    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.CANCELLED]: {
-    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.EXPIRED]: {
-    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.SYSTEM_ADMIN] },
+    PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.PURGED]: {},
 };
 
+export class IllegalTransitionError extends Error {
+  statusCode: number;
+  constructor(message: string) {
+    super(message);
+    this.name = 'IllegalTransitionError';
+    this.statusCode = 409;
+  }
+}
+
 export function canTransition(currentState: SubmissionState, action: Action, role: UserRole): boolean {
-  const rule = StateMachine[currentState][action];
+  const rule = StateMachine[currentState]?.[action];
   if (!rule) return false;
-  
-  // system_admin is meant for system tasks like assigning steps or purging.
-  // In a real application, you might use a specific service role token to represent the system.
   return rule.allowedRoles.includes(role);
 }
 
 export function getNextState(currentState: SubmissionState, action: Action): SubmissionState | null {
-  const rule = StateMachine[currentState][action];
+  const rule = StateMachine[currentState]?.[action];
   if (!rule) return null;
   return rule.to;
+}
+
+export function validateTransition(currentState: SubmissionState, action: Action, role: UserRole): SubmissionState {
+  if (!canTransition(currentState, action, role)) {
+    throw new IllegalTransitionError(
+      `Illegal transition: Cannot perform action '${action}' on submission in state '${currentState}' with role '${role}'.`
+    );
+  }
+  const next = getNextState(currentState, action);
+  if (!next) {
+    throw new IllegalTransitionError(
+      `No target state defined for action '${action}' from '${currentState}'.`
+    );
+  }
+  return next;
 }

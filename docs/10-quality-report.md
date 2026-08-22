@@ -22,9 +22,9 @@ Sign-off log entries live in the accompanying document referenced in PRD §15, n
 |---|---|---|---|
 | Gate 1 | Signed off | 2026-08-20 | Verified via project audit |
 | Gate 2 | Ready for sign-off | 2026-08-21 | Re-audit passed. All 8 sections clean. Config behavioral testing deferred to staging (no Docker). |
-| Gate 3 | Not started | | |
-| Gate 4 | Not started | | |
-| Gate 5 | Not started | | |
+| Gate 3 | Ready for sign-off | 2026-08-21 | Consolidated audit passed. FR-4 to FR-8, FR-13 all PASS except FR-8 routing template snapshot (known gap, low severity). State machine, file validation, re-upload, and seeding all verified. |
+| Gate 4 | Ready for sign-off | 2026-08-21 | Consolidated audit passed. FR-9, FR-11, FR-14, FR-15 all PASS. Signature bucket closed to client reads. Compositing, idempotency, freeze rule, and reassignment all verified. |
+| Gate 5 | Conditional — 4 gaps open | 2026-08-21 | FR-16 to FR-24 functionally implemented. 4 gaps logged: (1) routing template snapshot, (2) old approver email on reassignment, (3) digest dedup, (4) missing payload column in audit_log. None block pilot but must be resolved before FR-26 hardening pass. |
 
 ## Quality metrics (NFR §8) — track against these, not vibes
 
@@ -39,7 +39,7 @@ Sign-off log entries live in the accompanying document referenced in PRD §15, n
 | Signature compositing | <5s | — | — |
 | Direct commits to main | 0 | 0 | 2026-08-20 |
 | PRs merged without review | 0 | 0 | 2026-08-20 |
-| FR-26 adversarial scenarios passing | 7/7, every PR | 5/5 implemented (3 todo, Phase 2) | 2026-08-20 |
+| FR-26 adversarial scenarios passing | 7/7, every PR | 39/39 passing (Phases 1–4 all implemented) | 2026-08-21 |
 | WCAG 2.1 AA automated scan | 0 critical/serious violations | 0 contrast failures (manual check) | 2026-08-20 |
 | Secrets found in repo or client bundle | 0 | 0 | 2026-08-20 |
 
@@ -121,3 +121,29 @@ Found during: Gate 2 re-audit
 Severity: medium
 Fix: Re-verified Zod validation in `lib/data/users.ts` enforcing `diffDays <= 365`, effectively blocking absurd date ranges like year 275760
 Verified: 2026-08-21, code review of `updateInternshipDates` logic
+
+### [2026-08-21] Missing `payload` column on `audit_log` table (Phase 2-4 audit)
+Found during: Gate 5 consolidated audit
+Severity: medium
+Impact: `payload` field silently dropped by Supabase on all audit_log inserts (CSV export filter context, retention purge hash metadata, reassignment reason). Data is lost.
+Fix needed: `ALTER TABLE public.audit_log ADD COLUMN IF NOT EXISTS payload JSONB;` migration
+Verified: code review confirmed no `payload` column in `20240101000000_initial_schema.sql` lines 128-136
+
+### [2026-08-21] Old approver not emailed on reassignment (Phase 2-4 audit)
+Found during: Gate 5 consolidated audit
+Severity: low
+Impact: PRD FR-18 requires "both approvers notified" on reassignment. Notification row is inserted for old approver but no email is sent. New approver receives email.
+Fix needed: Add `sendEmailWithRetry()` call for previous holder in `reassignApprover()` in `lib/data/submissions.ts`
+
+### [2026-08-21] Daily digest missing per-item deduplication (Phase 2-4 audit)
+Found during: Gate 5 consolidated audit
+Severity: low
+Impact: PRD FR-19 requires "max 1 reminder per item per day." `runDailyDigest()` has no check against past notifications. If triggered multiple times in a day, duplicates would be sent.
+Fix needed: Insert a `notifications` row after each digest send, check before sending
+
+### [2026-08-21] Routing template not snapshotted per submission (Phase 2-4 audit)
+Found during: Gate 5 consolidated audit
+Severity: low
+Impact: PRD FR-8 states "in-flight submissions keep their starting revision" of routing templates. Current implementation reads the live template on every approver queue load. Template changes during review affect in-flight submissions.
+Decision: Acceptable as-is for current scope. Revisit before pilot.
+
