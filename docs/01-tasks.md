@@ -60,10 +60,10 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 - [x] Submission timeline view: every event with actor, role, local timestamp, read-only, shows current holder and step X of N
 - [x] Deletion countdown on checklist once fewer than 14 days remain
-- [~] Resend integration for all FR-18 events: submission received, returned, approved, step assigned/reassigned, deletion warnings — no document content or attachment in any email, retry up to 3 times on failure
-- [~] Daily reminder digest job: items past their SLA target (default 2 working days) to the approver; anything past 5 working days copies the admin; max 1 reminder per item per day
+- [x] Resend integration for all FR-18 events: submission received, returned, approved, step assigned/reassigned, deletion warnings — no document content or attachment in any email, retry up to 3 times on failure
+- [x] Daily reminder digest job: items past their SLA target (default 2 working days) to the approver; anything past 5 working days copies the admin; max 1 reminder per item per day
 - [x] Admin completion dashboard: intern × requirement matrix, filterable by requirement/state/approver, renders under 3s at 100×10
-- [~] CSV export of filtered view, under 60s, audit-logged with requesting actor
+- [x] CSV export of filtered view, under 60s, audit-logged with requesting actor
 - [x] Retention job (daily): delete file bytes 30 days after approval, or 30 days after internship end for never-approved items; keep submission/approval/hash/comments/audit rows; must not run before the FR-17 warnings have been sent; each deletion audit-logged with hash and timestamp
 - [x] Post-deletion approval record view for admins: intern, requirement, approver, timestamp, step, version, hash, deletion timestamp, clearly labelled as document-deleted
 - [x] Append-only audit log: no application role can update or delete a row (enforce with grants, not just application logic), queryable by actor and by target

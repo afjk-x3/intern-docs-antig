@@ -870,6 +870,11 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
       event_type: 'STEP_REASSIGNED_AWAY',
       payload: { submission_id: submissionId, reason: parsedReason },
     });
+
+    const { data: previousApprover } = await adminClient.from('users').select('email').eq('id', previousHolderId).single();
+    if (previousApprover) {
+      await sendEmailWithRetry(previousApprover.email, `Document Reassigned Away: ${typedSub.requirements?.name}`, emailTemplates.stepReassigned(typedSub.requirements?.name || 'Document', parsedReason));
+    }
   }
 
   await adminClient.from('notifications').insert({

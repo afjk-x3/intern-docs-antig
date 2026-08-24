@@ -24,7 +24,7 @@ Sign-off log entries live in the accompanying document referenced in PRD §15, n
 | Gate 2 | Signed off | 2026-08-24 | Independent re-audit passed. |
 | Gate 3 | Signed off | 2026-08-24 | All FRs verified, including FR-8 (Routing template snapshotting). |
 | Gate 4 | Signed off | 2026-08-24 | Re-verified via post-fix audit. Freeze rule RLS vulnerability mitigated. |
-| Gate 5 | Conditional — 3 gaps open | 2026-08-21 | FR-16 to FR-24 functionally implemented. 3 gaps logged: (1) old approver email on reassignment, (2) digest dedup, (3) missing payload column in audit_log. None block pilot but must be resolved before FR-26 hardening pass. |
+| Gate 5 | Ready for sign-off | 2026-08-24 | All FR-16 to FR-24 requirements verified. Gaps in routing snapshot, old approver email, digest deduplication, and audit_log payload have all been successfully fixed. |
 
 ## Quality metrics (NFR §8) — track against these, not vibes
 

@@ -30,6 +30,7 @@ export async function runDailyDigest() {
       created_at,
       current_step,
       current_holder_id,
+      intern_id,
       requirements(id, name, routing_templates(sla_days)),
       users!submissions_intern_id_fkey(email)
     `)
@@ -40,8 +41,23 @@ export async function runDailyDigest() {
     return;
   }
 
+  // Deduplication: Fetch DAILY_REMINDER notifications sent today
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+
+  const { data: todayNotifications } = await adminClient
+    .from('notifications')
+    .select('payload')
+    .eq('event_type', 'DAILY_REMINDER')
+    .gte('created_at', startOfDay.toISOString());
+
+  const sentToday = new Set(
+    (todayNotifications || []).map(n => n.payload?.submission_id)
+  );
+
   const approverReminders = new Map<string, number>(); // approver_id -> count
   const adminEscalations: { internEmail: string; reqName: string }[] = [];
+  const notificationsToInsert: any[] = [];
 
   for (const sub of submissions) {
     const lastUpdate = new Date(sub.updated_at || sub.created_at);
@@ -52,6 +68,8 @@ export async function runDailyDigest() {
     const sla = sub.requirements?.routing_templates?.sla_days || 2;
 
     if (waitingDays > sla) {
+      if (sentToday.has(sub.id)) continue;
+
       if (sub.current_holder_id) {
         const count = approverReminders.get(sub.current_holder_id) || 0;
         approverReminders.set(sub.current_holder_id, count + 1);
@@ -65,6 +83,12 @@ export async function runDailyDigest() {
           reqName: sub.requirements?.name || 'Document',
         });
       }
+
+      notificationsToInsert.push({
+        user_id: sub.current_holder_id || sub.intern_id,
+        event_type: 'DAILY_REMINDER',
+        payload: { submission_id: sub.id },
+      });
     }
   }
 
@@ -94,6 +118,11 @@ export async function runDailyDigest() {
         );
       }
     }
+  }
+
+  // 4. Record notifications to prevent duplicates
+  if (notificationsToInsert.length > 0) {
+    await adminClient.from('notifications').insert(notificationsToInsert);
   }
 
   console.log(`Daily digest complete. Sent ${approverReminders.size} approver reminders and ${adminEscalations.length} escalations.`);
