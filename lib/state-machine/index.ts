@@ -49,7 +49,7 @@ export const StateMachine: Record<SubmissionState, Partial<Record<Action, Transi
     APPROVE_INTERMEDIATE: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
     APPROVE_FINAL: { to: SubmissionState.APPROVED, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
     RETURN: { to: SubmissionState.RETURNED, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
-    REASSIGN: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
+    REASSIGN: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.APPROVER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
     EXPIRE: { to: SubmissionState.EXPIRED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.RETURNED]: {

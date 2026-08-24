@@ -440,12 +440,19 @@ export function ApproverQueue({
                   onChange={(e) => setReassignApproverId(e.target.value)}
                   className="w-full rounded-lg border border-border-default p-2 text-xs text-text-primary focus:border-brand-primary outline-none"
                 >
-                  {approversList.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.email} ({a.role})
-                    </option>
-                  ))}
+                  {approversList
+                    .filter((a) => a.email !== approverEmail)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.email} ({a.role})
+                      </option>
+                    ))}
                 </select>
+                {approversList.filter((a) => a.email !== approverEmail).length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    No other approver accounts found. Add another approver in Admin &gt; Users.
+                  </p>
+                )}
               </div>
 
               <div>
