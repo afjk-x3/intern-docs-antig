@@ -11,7 +11,13 @@ const requirementSchema = z.object({
   max_size_mb: z.number().int().min(1).max(50).default(20),
   due_date_type: z.enum(['fixed', 'relative']),
   due_date_value: z.string().min(1, 'Due date value is required'),
-  routing_template_id: z.string().uuid().optional().nullable(),
+  routing_template_id: z
+    .string()
+    .uuid('Invalid template ID')
+    .optional()
+    .nullable()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : null)),
 });
 
 export async function getRequirements() {

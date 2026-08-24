@@ -2,6 +2,7 @@ import { inviteUser } from '@lib/data/auth';
 import { getRequirements, createRequirement } from '@lib/data/requirements';
 import { getRoutingTemplates, createRoutingTemplate } from '@lib/data/routing';
 import { AdminRequirementManager, CreateRequirementInput, CreateRoutingTemplateInput } from '@/components/AdminRequirementManager';
+import { AdminInviteForm } from '@/components/AdminInviteForm';
 import { createClient } from '@lib/supabase/server';
 import { redirect } from 'next/navigation';
 
@@ -20,9 +21,15 @@ export default async function AdminDashboard() {
 
   async function handleInvite(formData: FormData) {
     'use server';
-    const email = formData.get('email') as string;
-    const role = formData.get('role') as string;
-    await inviteUser(email, role);
+    try {
+      const email = formData.get('email') as string;
+      const role = formData.get('role') as string;
+      const res = await inviteUser(email, role);
+      return { success: true, inviteLink: res.inviteLink };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send invitation';
+      return { error: msg };
+    }
   }
 
   async function handleCreateReq(data: CreateRequirementInput) {
@@ -75,41 +82,7 @@ export default async function AdminDashboard() {
         </div>
 
         {/* User Invitation Section */}
-        <div className="bg-surface-bg p-6 rounded-xl shadow-xs border border-border-default">
-          <h2 className="text-base font-bold text-text-primary mb-1">Invite New User</h2>
-          <p className="text-xs text-text-muted mb-4">Send an onboarding invitation with assigned organizational role.</p>
-          <form action={handleInvite} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-text-primary mb-1">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                required
-                placeholder="user@makerspace.ph"
-                className="w-full border border-border-default rounded-lg p-2 text-xs text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-primary mb-1">Role</label>
-              <select
-                name="role"
-                className="w-full border border-border-default rounded-lg p-2 text-xs text-text-primary focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
-              >
-                <option value="intern">Intern</option>
-                <option value="approver">Approver</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
-              >
-                Send Invite
-              </button>
-            </div>
-          </form>
-        </div>
+        <AdminInviteForm onInviteAction={handleInvite} />
 
         {/* Requirement Definitions & Workflows */}
         <AdminRequirementManager

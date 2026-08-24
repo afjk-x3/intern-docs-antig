@@ -16,11 +16,12 @@ export default async function LoginPage({
     try {
       const result = await login(formData);
       if (!result.success) throw new Error(result.error);
-      redirect('/');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Login failed';
       redirect(`/login?error=${encodeURIComponent(msg)}`);
     }
+
+    redirect('/');
   }
 
   return (

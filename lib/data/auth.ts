@@ -3,6 +3,7 @@ import { createAdminClient } from '../supabase/admin';
 import { createClient } from '../supabase/server';
 import { z } from 'zod';
 import { headers } from 'next/headers';
+import { sendInviteEmail } from '../email';
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -31,15 +32,34 @@ export async function inviteUser(email: string, role: string) {
   const parsed = inviteSchema.parse({ email, role });
   const adminClient = createAdminClient();
 
-  // Call Supabase invite
-  const { data: invitedUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(parsed.email);
-  if (inviteError || !invitedUser.user) {
-    throw new Error(`Failed to invite user: ${inviteError?.message}`);
+  // Generate invite link for custom branded Resend email delivery
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'invite',
+    email: parsed.email,
+    options: {
+      redirectTo: 'http://localhost:3000/accept-invite',
+    },
+  });
+
+  if (linkError || !linkData?.user) {
+    throw new Error(`Failed to invite user: ${linkError?.message}`);
   }
 
-  // Insert into public.users
-  const { error: insertError } = await adminClient.from('users').insert({
-    id: invitedUser.user.id,
+  const userId = linkData.user.id;
+  const inviteLink = linkData.properties?.action_link || null;
+
+  // Send branded invitation email via Resend (non-blocking)
+  if (inviteLink) {
+    try {
+      await sendInviteEmail(parsed.email, parsed.role, inviteLink);
+    } catch (emailErr) {
+      console.warn('[Invite] Email sending failed non-fatally:', emailErr);
+    }
+  }
+
+  // Insert or upsert into public.users
+  const { error: insertError } = await adminClient.from('users').upsert({
+    id: userId,
     email: parsed.email,
     role: parsed.role,
   });
@@ -55,12 +75,12 @@ export async function inviteUser(email: string, role: string) {
   await adminClient.from('audit_log').insert({
     actor_id: currentUser.id,
     action: 'INVITE_USER',
-    target_id: invitedUser.user.id,
+    target_id: userId,
     target_type: 'users',
     source_ip: ip,
   });
 
-  return { success: true, userId: invitedUser.user.id };
+  return { success: true, userId, inviteLink };
 }
 
 const passwordSchema = z.object({

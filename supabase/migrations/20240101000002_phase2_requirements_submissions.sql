@@ -39,7 +39,7 @@ INSERT INTO public.requirements (id, name, description, accepted_types, max_size
 VALUES
   (
     '11111111-1111-1111-1111-111111111111',
-    'Evaluation Paper',
+    'Evaluation Paper',a
     'Mid-term or final evaluation form completed by your school OJT coordinator or mentor.',
     ARRAY['application/pdf', 'image/png', 'image/jpeg'],
     20,

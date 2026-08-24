@@ -16,11 +16,12 @@ export default async function OnboardingPage({
 
     try {
       await updateInternshipDates(start, end);
-      redirect('/');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to set dates';
       redirect(`/onboarding?error=${encodeURIComponent(msg)}`);
     }
+
+    redirect('/');
   }
 
   return (

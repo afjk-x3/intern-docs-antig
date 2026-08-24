@@ -261,6 +261,7 @@ export function AdminRequirementManager({
                     onChange={(e) => setRoutingTemplateId(e.target.value)}
                     className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
                   >
+                    <option value="">Default (Single Supervisor Review)</option>
                     {routingTemplates.map((t) => (
                       <option key={t.id} value={t.id}>{t.name} (SLA: {t.sla_days}d)</option>
                     ))}
