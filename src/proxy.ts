@@ -19,10 +19,14 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            supabaseResponse.cookies.set(name, value, options);
-          });
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value);
+              supabaseResponse.cookies.set(name, value, options);
+            });
+          } catch {
+            // Ignored in middleware
+          }
         },
       },
     }
@@ -61,21 +65,35 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  // Protection logic
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/accept-invite');
-  
-  if (!user && !isAuthRoute) {
+  // Route classification
+  const pathname = request.nextUrl.pathname;
+  const isAuthCallback = pathname.startsWith('/auth');
+  const isLoginPage = pathname.startsWith('/login');
+  const isAcceptInvite = pathname.startsWith('/accept-invite');
+
+  // Allow all /auth routes unconditionally (callback code exchange, signout, OTP verification)
+  if (isAuthCallback) {
+    return supabaseResponse;
+  }
+
+  // Unauthenticated users can access /login and /accept-invite
+  if (!user) {
+    if (isLoginPage || isAcceptInvite) {
+      return supabaseResponse;
+    }
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isAuthRoute) {
+  // Authenticated users visiting /login should be sent to their dashboard
+  if (isLoginPage) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/'; // Dashboard
+    redirectUrl.pathname = '/';
     return NextResponse.redirect(redirectUrl);
   }
 
+  // Authenticated users on /accept-invite can stay to set their password
   return supabaseResponse;
 }
 
