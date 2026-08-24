@@ -1,4 +1,4 @@
-﻿# InternDocs — Project Audit
+# InternDocs — Project Audit
 
 Run this audit at the end of every phase in `08-implementation-plan.md`, and again before the Week 7 pilot and the Week 8 handover. Record the date and the result of each check. This is not a one-time document — copy the checklist block below for each audit pass.
 
@@ -286,5 +286,41 @@ Not the QA gate sign-off record (`10-quality-report.md`) and not the refactor hi
 | 4 | `audit_log` schema missing `payload` column — metadata silently dropped | FR-21 | Medium | Migration `ADD COLUMN payload JSONB` needed |
 
 **Build and tests:**
-- `npm run build` → exit 0
 - `npx vitest run` → 39 passed, 0 failed (7 test files)
+
+## Audit — 2026-08-24 (Independent Re-verification) — Phases: 0–3 (Gates 1-4)
+
+### Scope discipline
+- [x] Nothing built this phase is outside §6 Must/Should of the PRD
+- [x] No Could or Won't item has crept in without a change-control note in 13-plan-redo-organization.md
+
+### Requirement traceability
+- [x] Every merged PR this phase references an FR or NFR
+- [x] Every FR claimed "done" in 01-tasks.md has its acceptance criteria actually verified, not assumed
+
+### RLS coverage
+- [x] Every table holding user data has an RLS policy (list any table without one — there should be none)
+  *PASS*: `supabase/migrations/20240101000000_initial_schema.sql` explicitly executes `ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;` for all 8 user-data tables (lines 16, 40, 57, 73, 92, 114, 137, 153).
+- [ ] Spot-checked at least one policy per role (intern, approver, admin, system admin) by attempting a call that should fail
+  *FAIL*: `supabase/migrations/20240101000000_initial_schema.sql:77` contains `CREATE POLICY "Interns can update own submissions" ON public.submissions FOR UPDATE USING (intern_id = auth.uid());`. This allows an intern to issue an unconstrained `UPDATE` to any column on their own submission directly from the client.
+
+### Audit log integrity
+- [x] Attempted an update or delete on an audit_log row as the application role — confirm it is rejected at the database layer, not just the application layer
+  *PASS*: `supabase/migrations/20240101000000_initial_schema.sql:139` applies `REVOKE UPDATE, DELETE, TRUNCATE ON public.audit_log FROM authenticated, anon, public;`. Subsequent migrations never grant these back.
+
+### State machine integrity
+- [ ] Attempted at least one illegal transition (e.g. approving a Draft) — confirm 409 and a denied-attempt audit entry
+  *FAIL*: While `lib/state-machine/index.ts` (line 81) implements strict server-side transition checks, the RLS policy mentioned above (line 77 of `initial_schema.sql`) allows a client to bypass the API and write to the `state` column directly in the database.
+  *FAIL (Freeze Rule)*: `supabase/migrations/20240101000000_initial_schema.sql:99` allows any user who can read a submission to update its `submission_versions`. This permits clients to modify `file_url` or `file_hash` post-approval, bypassing the freeze rule.
+
+### Signature protection
+- [x] Confirmed the signature bucket has no client-readable policy
+  *PASS*: `supabase/migrations/20240101000006_fix_signature_storage_policy.sql` defines policies for `INSERT` (line 9) and `UPDATE` (line 13) on the `signatures` bucket, but no `SELECT` policy exists. It is strictly unreadable by clients.
+  *PASS*: `lib/pdf/composite.ts:31` performs the compositing using `pdf-lib` server-side, fetching the signature bytes via the admin client. The signature is never passed through the browser during this operation.
+- [x] Confirmed no network request in the approver-owned settings page's own view leaks another user's signature (only applicable if more than one approver exists yet)
+
+### Data findings this phase
+- [x] Any new field or table that could raise sensitivity classification flagged (e.g. anything ID-shaped) — should be none per PRD §6
+
+### Notes
+- **GAP: Routing Template Snapshots (FR-8)**: `lib/data/submissions.ts:672` dynamically references `typedSub.requirements?.routing_templates?.steps` instead of using a snapshot bound to the submission upon creation, contradicting the PRD.

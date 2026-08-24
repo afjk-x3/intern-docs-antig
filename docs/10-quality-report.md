@@ -20,10 +20,10 @@ Sign-off log entries live in the accompanying document referenced in PRD §15, n
 
 | Gate | Status | Date reviewed | Notes |
 |---|---|---|---|
-| Gate 1 | Signed off | 2026-08-20 | Verified via project audit |
-| Gate 2 | Ready for sign-off | 2026-08-21 | Re-audit passed. All 8 sections clean. Config behavioral testing deferred to staging (no Docker). |
-| Gate 3 | Ready for sign-off | 2026-08-21 | Consolidated audit passed. FR-4 to FR-8, FR-13 all PASS except FR-8 routing template snapshot (known gap, low severity). State machine, file validation, re-upload, and seeding all verified. |
-| Gate 4 | Ready for sign-off | 2026-08-21 | Consolidated audit passed. FR-9, FR-11, FR-14, FR-15 all PASS. Signature bucket closed to client reads. Compositing, idempotency, freeze rule, and reassignment all verified. |
+| Gate 1 | Conditional — 1 gap open | 2026-08-24 | Downgraded from Signed off. FAIL: State machine can be bypassed because RLS allows unconstrained UPDATE on public.submissions by interns. |
+| Gate 2 | Ready for sign-off | 2026-08-24 | Independent re-audit passed. |
+| Gate 3 | Conditional — 2 gaps open | 2026-08-24 | Downgraded from Ready for sign-off. FAIL: State machine RLS bypass (same as Gate 1). GAP: Routing template not snapshotted per submission (FR-8). |
+| Gate 4 | Conditional — 1 gap open | 2026-08-24 | Downgraded from Ready for sign-off. FAIL: Freeze rule can be bypassed because RLS allows unconstrained UPDATE on public.submission_versions post-approval. |
 | Gate 5 | Conditional — 4 gaps open | 2026-08-21 | FR-16 to FR-24 functionally implemented. 4 gaps logged: (1) routing template snapshot, (2) old approver email on reassignment, (3) digest dedup, (4) missing payload column in audit_log. None block pilot but must be resolved before FR-26 hardening pass. |
 
 ## Quality metrics (NFR §8) — track against these, not vibes
@@ -147,3 +147,8 @@ Severity: low
 Impact: PRD FR-8 states "in-flight submissions keep their starting revision" of routing templates. Current implementation reads the live template on every approver queue load. Template changes during review affect in-flight submissions.
 Decision: Acceptable as-is for current scope. Revisit before pilot.
 
+### [2026-08-24] State machine and Freeze Rule bypass via RLS
+Found during: Gate 1-4 independent re-audit
+Severity: critical
+Impact: `CREATE POLICY "Interns can update own submissions" ON public.submissions FOR UPDATE` and `CREATE POLICY "Users can update versions for readable submissions" ON public.submission_versions FOR UPDATE` allow clients to bypass the server-side state machine and modify approved artifacts directly.
+Fix needed: Add column-level restrictions, database trigger, or restrict UPDATE to a secure backend role.
