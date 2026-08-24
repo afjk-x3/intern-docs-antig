@@ -58,29 +58,29 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 4 — Retention, Notifications, Admin (Week 6, FR-16 to FR-24)
 
-- [ ] Submission timeline view: every event with actor, role, local timestamp, read-only, shows current holder and step X of N
-- [ ] Deletion countdown on checklist once fewer than 14 days remain
-- [ ] Resend integration for all FR-18 events: submission received, returned, approved, step assigned/reassigned, deletion warnings — no document content or attachment in any email, retry up to 3 times on failure
-- [ ] Daily reminder digest job: items past their SLA target (default 2 working days) to the approver; anything past 5 working days copies the admin; max 1 reminder per item per day
-- [ ] Admin completion dashboard: intern × requirement matrix, filterable by requirement/state/approver, renders under 3s at 100×10
-- [ ] CSV export of filtered view, under 60s, audit-logged with requesting actor
-- [ ] Retention job (daily): delete file bytes 30 days after approval, or 30 days after internship end for never-approved items; keep submission/approval/hash/comments/audit rows; must not run before the FR-17 warnings have been sent; each deletion audit-logged with hash and timestamp
-- [ ] Post-deletion approval record view for admins: intern, requirement, approver, timestamp, step, version, hash, deletion timestamp, clearly labelled as document-deleted
-- [ ] Append-only audit log: no application role can update or delete a row (enforce with grants, not just application logic), queryable by actor and by target
+- [x] Submission timeline view: every event with actor, role, local timestamp, read-only, shows current holder and step X of N
+- [x] Deletion countdown on checklist once fewer than 14 days remain
+- [x] Resend integration for all FR-18 events: submission received, returned, approved, step assigned/reassigned, deletion warnings — no document content or attachment in any email, retry up to 3 times on failure
+- [x] Daily reminder digest job: items past their SLA target (default 2 working days) to the approver; anything past 5 working days copies the admin; max 1 reminder per item per day
+- [x] Admin completion dashboard: intern × requirement matrix, filterable by requirement/state/approver, renders under 3s at 100×10
+- [x] CSV export of filtered view, under 60s, audit-logged with requesting actor
+- [x] Retention job (daily): delete file bytes 30 days after approval, or 30 days after internship end for never-approved items; keep submission/approval/hash/comments/audit rows; must not run before the FR-17 warnings have been sent; each deletion audit-logged with hash and timestamp
+- [x] Post-deletion approval record view for admins: intern, requirement, approver, timestamp, step, version, hash, deletion timestamp, clearly labelled as document-deleted
+- [x] Append-only audit log: no application role can update or delete a row (enforce with grants, not just application logic), queryable by actor and by target
 
 ## Phase 5 — Hardening & Pilot (Week 7, FR-25, FR-26, NFRs)
 
-- [ ] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
-- [ ] Privacy notice shown and acknowledged at first login, acknowledgement recorded
-- [ ] Full FR-26 adversarial suite green in CI, blocking merge:
-  - intern reads another intern's submission
-  - approver acts on an unassigned step
-  - approver acts after reassignment
-  - intern calls an admin endpoint
-  - edit attempt on an approved submission
-  - direct storage access without a signed URL
-  - client-side fetch of a stored signature image
-- [ ] Automated accessibility scan + manual keyboard pass, WCAG 2.1 AA
+- [x] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
+- [x] Privacy notice shown and acknowledged at first login, acknowledgement recorded
+- [x] Full FR-26 adversarial suite green in CI, blocking merge:
+  - [x] intern reads another intern's submission
+  - [x] approver acts on an unassigned step
+  - [x] approver acts after reassignment
+  - [x] intern calls an admin endpoint
+  - [x] edit attempt on an approved submission
+  - [x] direct storage access without a signed URL
+  - [x] client-side fetch of a stored signature image
+- [x] Automated accessibility scan + manual keyboard pass, WCAG 2.1 AA
 - [ ] Backup restore rehearsed at least once
 - [ ] Pilot: 3–5 real DTRs through the full flow with the actual approver signing
 

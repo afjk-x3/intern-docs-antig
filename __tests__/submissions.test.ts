@@ -40,6 +40,11 @@ describe('Submission State Machine Transitions (Appendix A)', () => {
     ).toThrow(IllegalTransitionError);
   });
 
+  it('allows Approver to reassign from IN_REVIEW to IN_REVIEW', () => {
+    const next = validateTransition(SubmissionState.IN_REVIEW, 'REASSIGN', UserRole.APPROVER);
+    expect(next).toBe(SubmissionState.IN_REVIEW);
+  });
+
   it('APPROVED state is terminal for non-system roles (cannot return or edit)', () => {
     expect(canTransition(SubmissionState.APPROVED, 'RETURN', UserRole.APPROVER)).toBe(false);
     expect(canTransition(SubmissionState.APPROVED, 'SUBMIT', UserRole.INTERN)).toBe(false);

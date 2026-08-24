@@ -85,6 +85,12 @@ export interface SubmissionWithRelations {
   current_step: number;
   current_holder_id: string | null;
   due_date: string | null;
+  routing_snapshot?: {
+    template_id?: string;
+    name?: string;
+    steps?: Array<{ step: number; role?: string; user_id?: string; name?: string }>;
+    sla_days?: number;
+  } | null;
   created_at: string;
   updated_at: string;
   users?: { id: string; email: string };
@@ -98,12 +104,15 @@ export interface SubmissionWithRelations {
  */
 function computeDueDate(req: RequirementRecord, internStart?: string | null): Date | null {
   if (req.due_date_type === 'fixed' && req.due_date_value) {
-    return new Date(req.due_date_value);
+    const d = new Date(req.due_date_value);
+    d.setHours(23, 59, 59, 999);
+    return d;
   }
   if (req.due_date_type === 'relative' && req.due_date_value && internStart) {
     const days = parseInt(req.due_date_value, 10) || 0;
     const date = new Date(internStart);
     date.setDate(date.getDate() + days);
+    date.setHours(23, 59, 59, 999);
     return date;
   }
   return null;
@@ -165,8 +174,9 @@ export async function getInternChecklist() {
     let deletionDaysRemaining: number | null = null;
 
     if (dueDate) {
-      const diffTime = dueDate.getTime() - now.getTime();
-      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime();
+      daysRemaining = Math.round((dueDay - startOfToday) / (1000 * 60 * 60 * 24));
       if (daysRemaining < 0 && sub?.state !== SubmissionState.APPROVED && sub?.state !== SubmissionState.PURGED) {
         isOverdue = true;
       }
@@ -317,7 +327,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
 
   if (role === 'approver' && typedSub.current_holder_id !== user.id && !typedSub.approvals?.some((a) => a.approver_id === user.id)) {
     const currentStep = typedSub.current_step;
-    const steps = typedSub.requirements?.routing_templates?.steps || [];
+    const steps = typedSub.routing_snapshot?.steps || typedSub.requirements?.routing_templates?.steps || [];
     const stepConfig = steps.find((s) => s.step === currentStep);
     if (!stepConfig || (stepConfig.role !== 'approver' && stepConfig.user_id !== user.id)) {
       throw new Error('Forbidden: This submission is not assigned to your review');
@@ -433,9 +443,20 @@ export async function uploadSubmission(formData: FormData) {
 
   let subId = existingSub?.id;
 
+  const routingSnapshot = typedReq.routing_templates
+    ? {
+        template_id: typedReq.routing_templates.id,
+        name: typedReq.routing_templates.name,
+        steps: typedReq.routing_templates.steps || [],
+        sla_days: typedReq.routing_templates.sla_days || 2,
+      }
+    : {
+        steps: [{ step: 1, role: 'approver', name: 'Supervisor Review' }],
+        sla_days: 2,
+      };
+
   if (!existingSub) {
-    // Insert new submission using authenticated user client so auth.uid() matches RLS
-    const { data: newSub, error: subInsertErr } = await supabase
+    const { data: newSub, error: subInsertErr } = await adminClient
       .from('submissions')
       .insert({
         intern_id: user.id,
@@ -444,6 +465,7 @@ export async function uploadSubmission(formData: FormData) {
         current_step: 1,
         current_holder_id: step1HolderId,
         due_date: dueDate ? dueDate.toISOString() : null,
+        routing_snapshot: routingSnapshot,
       })
       .select()
       .single();
@@ -453,14 +475,15 @@ export async function uploadSubmission(formData: FormData) {
     }
     subId = newSub.id;
   } else {
-    // Update existing submission record to IN_REVIEW
-    await supabase
+    // Update existing submission record to IN_REVIEW via admin client
+    await adminClient
       .from('submissions')
       .update({
         state: SubmissionState.IN_REVIEW,
         current_step: 1,
         current_holder_id: step1HolderId,
         due_date: dueDate ? dueDate.toISOString() : null,
+        routing_snapshot: routingSnapshot,
         updated_at: new Date().toISOString(),
       })
       .eq('id', subId);
@@ -669,7 +692,7 @@ export async function approveSubmissionSigned(submissionId: string) {
 
   const typedSub = submission as unknown as SubmissionWithRelations;
   const currentStep = typedSub.current_step || 1;
-  const steps = (typedSub.requirements?.routing_templates?.steps || [{ step: 1, role: 'approver' }]) as Array<{ step: number; role?: string; user_id?: string; name?: string }>;
+  const steps = (typedSub.routing_snapshot?.steps || typedSub.requirements?.routing_templates?.steps || [{ step: 1, role: 'approver' }]) as Array<{ step: number; role?: string; user_id?: string; name?: string }>;
   const totalSteps = steps.length;
   const isFinalStep = currentStep >= totalSteps;
 

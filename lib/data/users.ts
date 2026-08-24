@@ -19,7 +19,7 @@ const datesSchema = z.object({
   message: "Internship cannot exceed 12 months",
 });
 
-export async function updateInternshipDates(start: string, end: string) {
+export async function updateInternshipDates(start: string, end: string, acknowledgePrivacy = true) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error('Not authenticated');
@@ -37,9 +37,19 @@ export async function updateInternshipDates(start: string, end: string) {
     throw new Error('Dates locked after first approval');
   }
 
+  const now = new Date().toISOString();
+  const updatePayload: Record<string, unknown> = {
+    internship_start: parsed.start,
+    internship_end: parsed.end,
+  };
+
+  if (acknowledgePrivacy) {
+    updatePayload.privacy_acknowledged_at = now;
+  }
+
   const { error: updateError } = await supabase
     .from('users')
-    .update({ internship_start: parsed.start, internship_end: parsed.end })
+    .update(updatePayload)
     .eq('id', user.id);
 
   if (updateError) throw new Error(updateError.message);
@@ -48,13 +58,26 @@ export async function updateInternshipDates(start: string, end: string) {
   const reqHeaders = await headers();
   const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
 
-  await adminClient.from('audit_log').insert({
-    actor_id: user.id,
-    action: 'UPDATE_INTERNSHIP_DATES',
-    target_id: user.id,
-    target_type: 'users',
-    source_ip: ip,
-  });
+  await adminClient.from('audit_log').insert([
+    {
+      actor_id: user.id,
+      action: 'UPDATE_INTERNSHIP_DATES',
+      target_id: user.id,
+      target_type: 'users',
+      source_ip: ip,
+    },
+    ...(acknowledgePrivacy
+      ? [
+          {
+            actor_id: user.id,
+            action: 'PRIVACY_NOTICE_ACKNOWLEDGED',
+            target_id: user.id,
+            target_type: 'users',
+            source_ip: ip,
+          },
+        ]
+      : []),
+  ]);
 
   return { success: true };
 }

@@ -49,7 +49,7 @@ export async function runDailyDigest() {
     
     // Default SLA is 2 days if not specified in routing template
     // @ts-expect-error nested field mapping
-    const sla = sub.requirements?.routing_templates?.sla_days || 2;
+    const sla = sub.routing_snapshot?.sla_days || sub.requirements?.routing_templates?.sla_days || 2;
 
     if (waitingDays > sla) {
       if (sub.current_holder_id) {

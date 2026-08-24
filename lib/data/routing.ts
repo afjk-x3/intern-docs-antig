@@ -32,7 +32,11 @@ export async function getRoutingTemplates() {
 
 export async function getApproversList() {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
     .from('users')
     .select('id, email, role')
     .in('role', ['approver', 'admin', 'system_admin'])

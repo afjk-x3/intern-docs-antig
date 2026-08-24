@@ -70,6 +70,17 @@ export function AdminRequirementManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowReqModal(false);
+        setShowTplModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleTypeToggle = (type: string) => {
     if (acceptedTypes.includes(type)) {
       if (acceptedTypes.length > 1) {

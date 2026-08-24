@@ -61,6 +61,17 @@ export function ApproverQueue({
   const [actionError, setActionError] = useState<string | null>(null);
   const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setModalType(null);
+        setSelectedSub(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const openApproveModal = (sub: ApproverQueueItem) => {
     setSelectedSub(sub);
     setModalType('approve');

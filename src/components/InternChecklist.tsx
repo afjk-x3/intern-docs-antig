@@ -221,7 +221,13 @@ export function InternChecklist({
                   </span>
                   {item.daysRemaining !== null && item.state !== 'APPROVED' && (
                     <span className={item.daysRemaining <= 3 ? 'text-rose-600 font-bold' : ''}>
-                      ({item.daysRemaining < 0 ? `${Math.abs(item.daysRemaining)} days overdue` : `${item.daysRemaining} days remaining`})
+                      ({item.daysRemaining < 0
+                        ? `${Math.abs(item.daysRemaining)} ${Math.abs(item.daysRemaining) === 1 ? 'day' : 'days'} overdue`
+                        : item.daysRemaining === 0
+                        ? 'Due today'
+                        : item.daysRemaining === 1
+                        ? '1 day remaining'
+                        : `${item.daysRemaining} days remaining`})
                     </span>
                   )}
                   {activeVer && (

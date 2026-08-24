@@ -43,7 +43,7 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
     load();
   }, [submissionId]);
 
-  const totalSteps = submission?.requirements?.routing_templates?.steps?.length || 1;
+  const totalSteps = submission?.routing_snapshot?.steps?.length || submission?.requirements?.routing_templates?.steps?.length || 1;
   const currentStep = submission?.current_step || 1;
 
   const getActionDescription = (action: string) => {
@@ -58,20 +58,39 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
     return lookup[action] || action;
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="timeline-modal-title"
+    >
       <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-surface-bg shadow-xl border border-border-default animate-in fade-in zoom-in-95 duration-150">
         
         <div className="p-6 border-b border-border-default flex justify-between items-start shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-text-primary">Submission Timeline</h3>
+            <h3 id="timeline-modal-title" className="text-lg font-bold text-text-primary">Submission Timeline</h3>
             {submission && (
               <p className="text-xs text-text-muted mt-1">
                 {submission.requirements?.name}
               </p>
             )}
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-text-muted">
+          <button
+            onClick={onClose}
+            aria-label="Close timeline modal"
+            className="p-1 rounded hover:bg-slate-100 text-text-muted focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:outline-none"
+          >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
