@@ -85,11 +85,11 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
                 Document Deleted (Retention Policy)
               </div>
               <p>The file bytes for this submission were permanently deleted on <strong>{new Date(activeVersion.deleted_at).toLocaleString()}</strong> in accordance with data retention policies.</p>
-              <p className="mt-2 font-mono text-[11px] bg-white px-2 py-1 border border-slate-200 rounded inline-block">
-                Original SHA-256 Hash: {activeVersion.file_hash}
+              <p className="mt-2 text-xs font-medium text-slate-700 bg-white px-2.5 py-1 border border-slate-200 rounded inline-block">
+                Document Record: Version {activeVersion.version_number}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                This record serves as cryptographic proof that the approval took place prior to data deletion.
+                This record serves as audit proof that the approval took place prior to data deletion.
               </p>
             </div>
           ) : (
@@ -113,8 +113,8 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
                       <p className="text-xs text-text-muted mt-1">{new Date(appr.created_at).toLocaleString()}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono text-[10px] text-text-muted bg-white border border-border-default px-2 py-1 rounded block mb-1">
-                        SHA-256: {appr.file_hash.substring(0, 16)}...
+                      <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded block mb-1">
+                        ✓ Verified Signature
                       </span>
                     </div>
                   </div>

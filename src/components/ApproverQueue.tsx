@@ -223,9 +223,6 @@ export function ApproverQueue({
                       </td>
                       <td className="px-6 py-4 text-text-primary">
                         <div className="font-semibold">{sub.requirements?.name}</div>
-                        <div className="text-xs text-text-muted font-mono">
-                          SHA-256: {activeVer?.file_hash.substring(0, 10)}...
-                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="inline-block px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 font-bold border border-slate-200">
@@ -310,8 +307,7 @@ export function ApproverQueue({
 
             <div className="mt-4 p-3 bg-surface-muted rounded-xl text-xs space-y-1.5 text-text-muted border border-border-default">
               <div><strong>Requirement:</strong> {selectedSub.requirements?.name}</div>
-              <div><strong>Version:</strong> v{selectedSub.activeVersion?.version_number}</div>
-              <div className="font-mono text-[11px]"><strong>SHA-256:</strong> {selectedSub.activeVersion?.file_hash.substring(0, 16)}...</div>
+              <div><strong>Version:</strong> Version {selectedSub.activeVersion?.version_number}</div>
             </div>
 
             {/* Signature Stamp Preview */}

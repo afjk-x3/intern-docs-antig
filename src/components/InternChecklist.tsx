@@ -225,8 +225,8 @@ export function InternChecklist({
                     </span>
                   )}
                   {activeVer && (
-                    <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                      v{activeVer.version_number} • {activeVer.file_hash.substring(0, 8)}...
+                    <span className="font-medium text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      Version {activeVer.version_number}
                     </span>
                   )}
                 </div>
@@ -257,8 +257,8 @@ export function InternChecklist({
                       on {new Date(latestAppr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                    SHA-256: {latestAppr.file_hash.substring(0, 12)}...
+                  <span className="text-[11px] font-medium text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded flex items-center gap-1">
+                    ✓ Sealed & Verified
                   </span>
                 </div>
               )}
