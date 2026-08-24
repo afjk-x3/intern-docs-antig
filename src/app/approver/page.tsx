@@ -72,74 +72,39 @@ export default async function ApproverDashboard() {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-surface-muted">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white font-bold">
-              ID
-            </div>
+    <div className="p-6 md:p-10 space-y-6">
+      {/* Missing Signature Alert Banner */}
+      {!hasSignature && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <span className="text-amber-600 text-lg">⚠️</span>
             <div>
-              <h1 className="text-xl font-bold text-text-primary">InternDocs — Approver Console</h1>
-              <p className="text-xs text-text-muted">Review, verify, and sign intern submissions</p>
+              <h4 className="text-xs font-bold text-amber-900">Signature Required for Approvals</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                You have not enrolled your digital signature stamp yet. You must enroll a signature before you can approve submissions.
+              </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/approver/signature"
-              className="text-xs text-text-primary font-semibold px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
-            >
-              <svg className="h-4 w-4 text-brand-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-              {hasSignature ? 'Manage Signature' : 'Enroll Signature'}
-            </Link>
-
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="text-xs text-text-muted hover:text-text-primary font-medium px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+          <Link
+            href="/approver/signature"
+            className="shrink-0 px-3.5 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
+          >
+            Enroll Signature Now →
+          </Link>
         </div>
+      )}
 
-        {/* Missing Signature Alert Banner */}
-        {!hasSignature && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-start gap-2.5">
-              <span className="text-amber-600 text-lg">⚠️</span>
-              <div>
-                <h4 className="text-xs font-bold text-amber-900">Signature Required for Approvals</h4>
-                <p className="text-xs text-amber-800 mt-0.5">
-                  You have not enrolled your digital signature stamp yet. You must enroll a signature before you can approve submissions.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/approver/signature"
-              className="shrink-0 px-3.5 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
-            >
-              Enroll Signature Now →
-            </Link>
-          </div>
-        )}
-
-        <ApproverQueue
-          items={items}
-          approverEmail={user.email}
-          hasSignature={hasSignature}
-          signaturePreviewUrl={signaturePreview.previewUrl}
-          approversList={approversList}
-          onApproveAction={handleApprove}
-          onReturnAction={handleReturn}
-          onReassignAction={handleReassign}
-          onGetDownloadUrlAction={handleGetDownloadUrl}
-        />
-      </div>
+      <ApproverQueue
+        items={items}
+        approverEmail={user.email}
+        hasSignature={hasSignature}
+        signaturePreviewUrl={signaturePreview.previewUrl}
+        approversList={approversList}
+        onApproveAction={handleApprove}
+        onReturnAction={handleReturn}
+        onReassignAction={handleReassign}
+        onGetDownloadUrlAction={handleGetDownloadUrl}
+      />
     </div>
   );
 }

@@ -47,37 +47,12 @@ export default async function InternDashboard() {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-surface-muted">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white font-bold">
-              ID
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-text-primary">InternDocs</h1>
-              <p className="text-xs text-text-muted">Makerspace Document Submission & Tracking</p>
-            </div>
-          </div>
-
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="text-xs text-text-muted hover:text-text-primary font-medium px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-
-        <InternChecklist
-          items={items}
-          internEmail={user.email}
-          onUploadAction={handleUpload}
-          onResubmitAction={handleResubmit}
-          onGetDownloadUrlAction={handleGetDownloadUrl}
-        />
-      </div>
-    </div>
+    <InternChecklist
+      items={items}
+      internEmail={user.email}
+      onUploadAction={handleUpload}
+      onResubmitAction={handleResubmit}
+      onGetDownloadUrlAction={handleGetDownloadUrl}
+    />
   );
 }

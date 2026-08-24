@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord } from '@lib/data/submissions';
 import Link from 'next/link';
+import { SubmissionTimelineModal } from './SubmissionTimelineModal';
 
 export interface ApproverQueueItem {
   id: string;
@@ -58,6 +59,7 @@ export function ApproverQueue({
   const [reassignReason, setReassignReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
 
   const openApproveModal = (sub: ApproverQueueItem) => {
     setSelectedSub(sub);
@@ -250,6 +252,13 @@ export function ApproverQueue({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                           View
+                        </button>
+                        <button
+                          onClick={() => setTimelineSubId(sub.id)}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                          title="View timeline history"
+                        >
+                          Timeline
                         </button>
                         <button
                           onClick={() => openReassignModal(sub)}
@@ -480,6 +489,14 @@ export function ApproverQueue({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Timeline Modal */}
+      {timelineSubId && (
+        <SubmissionTimelineModal
+          submissionId={timelineSubId}
+          onClose={() => setTimelineSubId(null)}
+        />
       )}
     </div>
   );

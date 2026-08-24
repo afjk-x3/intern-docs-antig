@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord, ApprovalRecord } from '@lib/data/submissions';
+import { SubmissionTimelineModal } from './SubmissionTimelineModal';
 
 export interface ChecklistItem {
   requirement: RequirementRecord;
@@ -14,6 +15,8 @@ export interface ChecklistItem {
   activeVersion: SubmissionVersionRecord | null;
   latestApproval: ApprovalRecord | null;
   versions: SubmissionVersionRecord[];
+  deletionDate?: string | null;
+  deletionDaysRemaining?: number | null;
 }
 
 interface InternChecklistProps {
@@ -36,6 +39,7 @@ export function InternChecklist({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
 
   const openUploadModal = (item: ChecklistItem) => {
     setSelectedItem(item);
@@ -189,6 +193,14 @@ export function InternChecklist({
                     </button>
                   )}
 
+                  {['SUBMITTED', 'IN_REVIEW', 'RETURNED', 'APPROVED'].includes(item.state) && sub?.id && (
+                    <button
+                      onClick={() => setTimelineSubId(sub.id!)}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-text-muted hover:text-text-primary hover:bg-slate-50 transition-colors"
+                    >
+                      Timeline
+                    </button>
+                  )}
                   {['SUBMITTED', 'IN_REVIEW'].includes(item.state) && sub?.id && (
                     <button
                       onClick={() => handleDownload(sub.id!)}
@@ -248,6 +260,18 @@ export function InternChecklist({
                   <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
                     SHA-256: {latestAppr.file_hash.substring(0, 12)}...
                   </span>
+                </div>
+              )}
+
+              {/* Deletion Countdown Banner */}
+              {item.deletionDaysRemaining !== undefined && item.deletionDaysRemaining !== null && item.deletionDaysRemaining < 14 && item.state !== 'PURGED' && activeVer && (
+                <div className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs border border-amber-200 text-amber-900 flex items-center gap-2">
+                  <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <strong>Data Retention Warning:</strong> This document will be permanently deleted from storage in {item.deletionDaysRemaining} days (on {new Date(item.deletionDate!).toLocaleDateString()}) per retention policy. Please download a copy for your records if needed.
+                  </div>
                 </div>
               )}
             </div>
@@ -314,6 +338,14 @@ export function InternChecklist({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Timeline Modal */}
+      {timelineSubId && (
+        <SubmissionTimelineModal
+          submissionId={timelineSubId}
+          onClose={() => setTimelineSubId(null)}
+        />
       )}
     </div>
   );

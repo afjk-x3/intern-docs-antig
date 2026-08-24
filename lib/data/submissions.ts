@@ -8,6 +8,23 @@ import { SubmissionState, UserRole, validateTransition } from '../state-machine'
 import { z } from 'zod';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
+import { sendEmailWithRetry } from '../email/resend';
+import { emailTemplates } from '../email/templates';
+
+// Helper to fetch emails for user ID or role
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getEmailsForRecipients(adminClient: any, userId: string | null, role: string | null): Promise<string[]> {
+  if (userId) {
+    const { data } = await adminClient.from('users').select('email').eq('id', userId).single();
+    return data ? [data.email] : [];
+  }
+  if (role) {
+    const { data } = await adminClient.from('users').select('email').eq('role', role);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return data ? data.map((u: any) => u.email) : [];
+  }
+  return [];
+}
 
 const returnCommentSchema = z.string().min(10, 'Return comment must be at least 10 characters explaining what needs correction.');
 const reassignReasonSchema = z.string().min(10, 'Reassignment reason must be at least 10 characters.');
@@ -144,6 +161,8 @@ export async function getInternChecklist() {
     
     let daysRemaining: number | null = null;
     let isOverdue = false;
+    let deletionDate: Date | null = null;
+    let deletionDaysRemaining: number | null = null;
 
     if (dueDate) {
       const diffTime = dueDate.getTime() - now.getTime();
@@ -164,6 +183,20 @@ export async function getInternChecklist() {
     // If a submission record exists but has no version files (e.g. from an interrupted initial upload), reset state to NOT_STARTED so user can upload
     const effectiveState = (!sub || versions.length === 0) ? 'NOT_STARTED' : sub.state;
 
+    // Calculate deletion date (FR-20)
+    if (effectiveState === 'APPROVED' && latestApproval) {
+      deletionDate = new Date(latestApproval.created_at);
+      deletionDate.setDate(deletionDate.getDate() + 30);
+    } else if (effectiveState !== 'APPROVED' && intern?.internship_end) {
+      deletionDate = new Date(intern.internship_end);
+      deletionDate.setDate(deletionDate.getDate() + 30);
+    }
+
+    if (deletionDate && effectiveState !== 'PURGED') {
+      const diffDelTime = deletionDate.getTime() - now.getTime();
+      deletionDaysRemaining = Math.ceil(diffDelTime / (1000 * 60 * 60 * 24));
+    }
+
     return {
       requirement: req,
       submission: sub || null,
@@ -174,10 +207,12 @@ export async function getInternChecklist() {
       activeVersion,
       latestApproval,
       versions,
+      deletionDate: deletionDate ? deletionDate.toISOString() : null,
+      deletionDaysRemaining,
     };
   });
 
-  return checklist;
+  return JSON.parse(JSON.stringify(checklist));
 }
 
 /**
@@ -228,7 +263,7 @@ export async function getApproverQueue() {
   const now = new Date();
   const typedData = (data || []) as unknown as SubmissionWithRelations[];
 
-  return typedData.map((sub) => {
+  const queue = typedData.map((sub) => {
     const versions = sub.submission_versions || [];
     const activeVersion = versions.find((v) => !v.is_superseded) || versions[0] || null;
     const dueDate = sub.due_date ? new Date(sub.due_date) : null;
@@ -242,6 +277,8 @@ export async function getApproverQueue() {
       waitingHours,
     };
   });
+
+  return JSON.parse(JSON.stringify(queue));
 }
 
 /**
@@ -291,6 +328,48 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
 }
 
 /**
+ * Fetch the timeline of events for a given submission.
+ */
+export async function getSubmissionTimeline(submissionId: string) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  // Verify access using getSubmissionDetails
+  await getSubmissionDetails(submissionId);
+
+  // Fetch audit logs for this submission
+  const adminClient = createAdminClient();
+  const { data: events, error: auditErr } = await adminClient
+    .from('audit_log')
+    .select(`
+      id,
+      action,
+      created_at,
+      actor_id
+    `)
+    .eq('target_id', submissionId)
+    .order('created_at', { ascending: false });
+
+  if (auditErr) throw new Error(`Failed to load timeline: ${auditErr.message}`);
+
+  // Fetch users manually since foreign key points to auth.users, not public.users
+  const actorIds = [...new Set(events.map(e => e.actor_id).filter(Boolean))];
+  const { data: usersData } = await adminClient
+    .from('users')
+    .select('id, email, role')
+    .in('id', actorIds);
+
+  const usersMap = new Map((usersData || []).map(u => [u.id, u]));
+  const timelineWithUsers = events.map(e => ({
+    ...e,
+    users: e.actor_id ? usersMap.get(e.actor_id) || null : null
+  }));
+
+  return JSON.parse(JSON.stringify(timelineWithUsers));
+}
+
+/**
  * Upload initial submission for a requirement.
  */
 export async function uploadSubmission(formData: FormData) {
@@ -307,7 +386,7 @@ export async function uploadSubmission(formData: FormData) {
 
   const { data: intern } = await supabase
     .from('users')
-    .select('id, role, internship_start')
+    .select('id, email, role, internship_start')
     .eq('id', user.id)
     .single();
 
@@ -428,6 +507,16 @@ export async function uploadSubmission(formData: FormData) {
     source_ip: ip,
   });
 
+  // Notify step 1 approver(s)
+  if (step1) {
+    const userId = 'user_id' in step1 ? step1.user_id : null;
+    const roleId = 'role' in step1 ? step1.role : null;
+    const emails = await getEmailsForRecipients(adminClient, userId || null, roleId || null);
+    for (const email of emails) {
+      await sendEmailWithRetry(email, `New Submission: ${typedReq.name}`, emailTemplates.submissionReceived(typedReq.name, intern.email || 'Intern'));
+    }
+  }
+
   return { success: true, submissionId: subId };
 }
 
@@ -535,6 +624,16 @@ export async function resubmitSubmission(formData: FormData) {
     target_type: 'submissions',
     source_ip: ip,
   });
+
+  // Notify step 1 approver(s)
+  if (step1) {
+    const userId = 'user_id' in step1 ? step1.user_id : null;
+    const roleId = 'role' in step1 ? step1.role : null;
+    const emails = await getEmailsForRecipients(adminClient, userId || null, roleId || null);
+    for (const email of emails) {
+      await sendEmailWithRetry(email, `Re-submission: ${typedSub.requirements?.name}`, emailTemplates.submissionReceived(typedSub.requirements?.name || 'Document', user.email || 'Intern'));
+    }
+  }
 
   return { success: true, version: nextVersionNumber };
 }
@@ -687,6 +786,26 @@ export async function approveSubmissionSigned(submissionId: string) {
     source_ip: ip,
   });
 
+  // Send approval email to intern
+  const { data: internUser } = await adminClient.from('users').select('email').eq('id', typedSub.intern_id).single();
+  if (internUser) {
+    await sendEmailWithRetry(internUser.email, `Submission Approved: ${typedSub.requirements?.name}`, emailTemplates.submissionApproved(typedSub.requirements?.name || 'Document', isFinalStep));
+  }
+
+  // If not final step, notify next approver(s)
+  if (!isFinalStep) {
+    const nextStepNumber = currentStep + 1;
+    const nextStepConfig = steps.find((s) => s.step === nextStepNumber);
+    if (nextStepConfig) {
+      const nextUserId = 'user_id' in nextStepConfig ? nextStepConfig.user_id : null;
+      const nextRoleId = 'role' in nextStepConfig ? nextStepConfig.role : null;
+      const emails = await getEmailsForRecipients(adminClient, nextUserId || null, nextRoleId || null);
+      for (const email of emails) {
+        await sendEmailWithRetry(email, `Assigned: ${typedSub.requirements?.name}`, emailTemplates.stepAssigned(typedSub.requirements?.name || 'Document'));
+      }
+    }
+  }
+
   return { success: true, final: isFinalStep, signedUrl: signedPdfStoragePath };
 }
 
@@ -755,6 +874,11 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
     target_type: 'submissions',
     source_ip: ip,
   });
+
+  const { data: newApprover } = await adminClient.from('users').select('email').eq('id', newApproverId).single();
+  if (newApprover) {
+    await sendEmailWithRetry(newApprover.email, `Reassigned: ${typedSub.requirements?.name}`, emailTemplates.stepReassigned(typedSub.requirements?.name || 'Document', parsedReason));
+  }
 
   return { success: true };
 }
@@ -829,6 +953,11 @@ export async function returnSubmission(submissionId: string, comment: string) {
     target_type: 'submissions',
     source_ip: ip,
   });
+
+  const { data: internUser } = await adminClient.from('users').select('email').eq('id', typedSub.intern_id).single();
+  if (internUser) {
+    await sendEmailWithRetry(internUser.email, `Submission Returned: ${typedSub.requirements?.name}`, emailTemplates.submissionReturned(typedSub.requirements?.name || 'Document'));
+  }
 
   return { success: true };
 }

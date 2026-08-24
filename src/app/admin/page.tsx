@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { inviteUser } from '@lib/data/auth';
 import { getRequirements, createRequirement } from '@lib/data/requirements';
 import { getRoutingTemplates, createRoutingTemplate } from '@lib/data/routing';
@@ -94,4 +95,10 @@ export default async function AdminDashboard() {
       </div>
     </div>
   );
+=======
+import { redirect } from 'next/navigation';
+
+export default function AdminRootPage() {
+  redirect('/admin/dashboard');
+>>>>>>> c60df75c096beb71269564c93f7e6817d603a9f1
 }
