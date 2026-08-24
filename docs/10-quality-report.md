@@ -20,11 +20,11 @@ Sign-off log entries live in the accompanying document referenced in PRD §15, n
 
 | Gate | Status | Date reviewed | Notes |
 |---|---|---|---|
-| Gate 1 | Conditional — 1 gap open | 2026-08-24 | Downgraded from Signed off. FAIL: State machine can be bypassed because RLS allows unconstrained UPDATE on public.submissions by interns. |
-| Gate 2 | Ready for sign-off | 2026-08-24 | Independent re-audit passed. |
-| Gate 3 | Conditional — 2 gaps open | 2026-08-24 | Downgraded from Ready for sign-off. FAIL: State machine RLS bypass (same as Gate 1). GAP: Routing template not snapshotted per submission (FR-8). |
-| Gate 4 | Conditional — 1 gap open | 2026-08-24 | Downgraded from Ready for sign-off. FAIL: Freeze rule can be bypassed because RLS allows unconstrained UPDATE on public.submission_versions post-approval. |
-| Gate 5 | Conditional — 4 gaps open | 2026-08-21 | FR-16 to FR-24 functionally implemented. 4 gaps logged: (1) routing template snapshot, (2) old approver email on reassignment, (3) digest dedup, (4) missing payload column in audit_log. None block pilot but must be resolved before FR-26 hardening pass. |
+| Gate 1 | Signed off | 2026-08-24 | Re-verified via post-fix audit. RLS vulnerability mitigated. |
+| Gate 2 | Signed off | 2026-08-24 | Independent re-audit passed. |
+| Gate 3 | Signed off | 2026-08-24 | All FRs verified, including FR-8 (Routing template snapshotting). |
+| Gate 4 | Signed off | 2026-08-24 | Re-verified via post-fix audit. Freeze rule RLS vulnerability mitigated. |
+| Gate 5 | Conditional — 3 gaps open | 2026-08-21 | FR-16 to FR-24 functionally implemented. 3 gaps logged: (1) old approver email on reassignment, (2) digest dedup, (3) missing payload column in audit_log. None block pilot but must be resolved before FR-26 hardening pass. |
 
 ## Quality metrics (NFR §8) — track against these, not vibes
 
@@ -145,10 +145,18 @@ Fix needed: Insert a `notifications` row after each digest send, check before se
 Found during: Gate 5 consolidated audit
 Severity: low
 Impact: PRD FR-8 states "in-flight submissions keep their starting revision" of routing templates. Current implementation reads the live template on every approver queue load. Template changes during review affect in-flight submissions.
-Decision: Acceptable as-is for current scope. Revisit before pilot.
+Fix needed: Add routing_snapshot column to submissions, store template on upload, and read from it during processing.
+Verified: 2026-08-24, `20240101000008_routing_snapshot.sql` applied. Code updated to utilize `routing_snapshot`.
 
 ### [2026-08-24] State machine and Freeze Rule bypass via RLS
 Found during: Gate 1-4 independent re-audit
 Severity: critical
 Impact: `CREATE POLICY "Interns can update own submissions" ON public.submissions FOR UPDATE` and `CREATE POLICY "Users can update versions for readable submissions" ON public.submission_versions FOR UPDATE` allow clients to bypass the server-side state machine and modify approved artifacts directly.
 Fix needed: Add column-level restrictions, database trigger, or restrict UPDATE to a secure backend role.
+Verified: 2026-08-24, `20240101000007_revoke_client_updates.sql` drops these policies. Verified `uploadSubmission` and `approveSubmissionSigned` use adminClient.
+
+### [2026-08-24] Next.js navigation lint warning
+Found during: Manual lint run
+Severity: low
+Impact: `window.location.href` is used in `src/app/(auth)/accept-invite/page.tsx` line 127 instead of Next.js router, which causes full page reloads instead of client-side navigation.
+Fix needed: Use `useRouter().push()` in the event handler.

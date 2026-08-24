@@ -43,7 +43,9 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
     load();
   }, [submissionId]);
 
-  const totalSteps = submission?.requirements?.routing_templates?.steps?.length || 1;
+  const totalSteps = submission?.routing_snapshot?.steps?.length
+    || submission?.requirements?.routing_templates?.steps?.length
+    || 1;
   const currentStep = submission?.current_step || 1;
 
   const getActionDescription = (action: string) => {

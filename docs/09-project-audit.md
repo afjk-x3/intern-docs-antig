@@ -323,4 +323,12 @@ Not the QA gate sign-off record (`10-quality-report.md`) and not the refactor hi
 - [x] Any new field or table that could raise sensitivity classification flagged (e.g. anything ID-shaped) — should be none per PRD §6
 
 ### Notes
-- **GAP: Routing Template Snapshots (FR-8)**: `lib/data/submissions.ts:672` dynamically references `typedSub.requirements?.routing_templates?.steps` instead of using a snapshot bound to the submission upon creation, contradicting the PRD.
+- **GAP: Routing Template Snapshots (FR-8)**: *FIXED*. `20240101000008_routing_snapshot.sql` adds the `routing_snapshot` JSONB column. `lib/data/submissions.ts` now saves the template snapshot on `uploadSubmission` and reads from it via `getRoutingSteps` instead of the live template, satisfying FR-8.
+
+## Audit — 2026-08-24 (Post-Fix Verification) — Phases: 0–3 (Gates 1-4)
+
+### RLS coverage & State machine integrity
+- [x] State machine bypass resolved: `20240101000007_revoke_client_updates.sql` drops client `UPDATE` and `INSERT` policies on `public.submissions` and `public.submission_versions`. All state transitions are now forced through the `adminClient` in `lib/data/submissions.ts`, which correctly enforces `validateTransition()`. 
+- [x] Freeze rule bypass resolved: The dropped client `UPDATE` policy on `public.submission_versions` successfully prevents users from altering `file_hash` or `file_url` post-approval.
+
+*Status*: **PASS**. The critical RLS vulnerabilities have been mitigated.

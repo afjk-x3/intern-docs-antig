@@ -87,6 +87,7 @@ export interface SubmissionWithRelations {
   due_date: string | null;
   created_at: string;
   updated_at: string;
+  routing_snapshot?: { steps?: Array<{ step: number; role?: string; user_id?: string; name?: string }>; sla_days?: number; name?: string } | null;
   users?: { id: string; email: string };
   requirements?: RequirementRecord | null;
   submission_versions?: SubmissionVersionRecord[];
@@ -107,6 +108,16 @@ function computeDueDate(req: RequirementRecord, internStart?: string | null): Da
     return date;
   }
   return null;
+}
+
+/**
+ * FR-8: Extract routing steps, preferring the frozen snapshot captured at submission
+ * time over the live template join. Legacy rows without a snapshot fall back to the
+ * live join so existing data keeps working.
+ */
+function getRoutingSteps(sub: SubmissionWithRelations): Array<{ step: number; role?: string; user_id?: string; name?: string }> {
+  if (sub.routing_snapshot?.steps) return sub.routing_snapshot.steps;
+  return sub.requirements?.routing_templates?.steps || [];
 }
 
 /**
@@ -246,6 +257,7 @@ export async function getApproverQueue() {
       due_date,
       created_at,
       updated_at,
+      routing_snapshot,
       users!submissions_intern_id_fkey(id, email),
       requirements(id, name, max_size_mb, accepted_types, signature_config, routing_templates(*)),
       submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at)
@@ -317,7 +329,7 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
 
   if (role === 'approver' && typedSub.current_holder_id !== user.id && !typedSub.approvals?.some((a) => a.approver_id === user.id)) {
     const currentStep = typedSub.current_step;
-    const steps = typedSub.requirements?.routing_templates?.steps || [];
+    const steps = getRoutingSteps(typedSub);
     const stepConfig = steps.find((s) => s.step === currentStep);
     if (!stepConfig || (stepConfig.role !== 'approver' && stepConfig.user_id !== user.id)) {
       throw new Error('Forbidden: This submission is not assigned to your review');
@@ -434,8 +446,8 @@ export async function uploadSubmission(formData: FormData) {
   let subId = existingSub?.id;
 
   if (!existingSub) {
-    // Insert new submission using authenticated user client so auth.uid() matches RLS
-    const { data: newSub, error: subInsertErr } = await supabase
+    // Insert new submission using admin client to enforce state machine
+    const { data: newSub, error: subInsertErr } = await adminClient
       .from('submissions')
       .insert({
         intern_id: user.id,
@@ -444,6 +456,7 @@ export async function uploadSubmission(formData: FormData) {
         current_step: 1,
         current_holder_id: step1HolderId,
         due_date: dueDate ? dueDate.toISOString() : null,
+        routing_snapshot: typedReq.routing_templates || null, // FR-8: freeze template at submission time
       })
       .select()
       .single();
@@ -454,7 +467,7 @@ export async function uploadSubmission(formData: FormData) {
     subId = newSub.id;
   } else {
     // Update existing submission record to IN_REVIEW
-    await supabase
+    await adminClient
       .from('submissions')
       .update({
         state: SubmissionState.IN_REVIEW,
@@ -462,6 +475,7 @@ export async function uploadSubmission(formData: FormData) {
         current_holder_id: step1HolderId,
         due_date: dueDate ? dueDate.toISOString() : null,
         updated_at: new Date().toISOString(),
+        routing_snapshot: typedReq.routing_templates || null, // FR-8: freeze template at submission time
       })
       .eq('id', subId);
   }
@@ -482,7 +496,7 @@ export async function uploadSubmission(formData: FormData) {
   }
 
   // Insert submission version v1
-  const { error: verErr } = await supabase
+  const { error: verErr } = await adminClient
     .from('submission_versions')
     .insert({
       submission_id: subId,
@@ -591,7 +605,7 @@ export async function resubmitSubmission(formData: FormData) {
   }
 
   // Insert version n+1
-  await supabase.from('submission_versions').insert({
+  await adminClient.from('submission_versions').insert({
     submission_id: typedSub.id,
     version_number: nextVersionNumber,
     file_url: storagePath,
@@ -600,11 +614,11 @@ export async function resubmitSubmission(formData: FormData) {
   });
 
   // Reset submission state to IN_REVIEW at step 1
-  const steps = (typedSub.requirements?.routing_templates?.steps || []) as Array<{ step: number; role?: string; user_id?: string; name?: string }>;
+  const steps = getRoutingSteps(typedSub);
   const step1 = steps.find((s) => s.step === 1) || { role: 'approver' };
   const step1HolderId = ('user_id' in step1 && step1.user_id) ? step1.user_id : null;
 
-  await supabase
+  await adminClient
     .from('submissions')
     .update({
       state: SubmissionState.IN_REVIEW,
@@ -669,7 +683,7 @@ export async function approveSubmissionSigned(submissionId: string) {
 
   const typedSub = submission as unknown as SubmissionWithRelations;
   const currentStep = typedSub.current_step || 1;
-  const steps = (typedSub.requirements?.routing_templates?.steps || [{ step: 1, role: 'approver' }]) as Array<{ step: number; role?: string; user_id?: string; name?: string }>;
+  const steps = getRoutingSteps(typedSub).length > 0 ? getRoutingSteps(typedSub) : [{ step: 1, role: 'approver' as const }];
   const totalSteps = steps.length;
   const isFinalStep = currentStep >= totalSteps;
 
