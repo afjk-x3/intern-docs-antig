@@ -71,7 +71,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (e) {
+    } catch {
       alert('Export failed.');
     } finally {
       setIsExporting(false);

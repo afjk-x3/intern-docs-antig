@@ -6,7 +6,7 @@ export default function RetentionPage() {
         <p className="text-sm text-text-muted mt-1">View records of purged submissions.</p>
       </div>
       <div className="bg-surface-bg p-6 rounded-xl border border-border-default flex items-center justify-center min-h-[300px]">
-        <p className="text-text-muted text-sm">Post-deletion records can be viewed by visiting a purged submission's direct link.</p>
+        <p className="text-text-muted text-sm">Post-deletion records can be viewed by visiting a purged submission&apos;s direct link.</p>
       </div>
     </div>
   );

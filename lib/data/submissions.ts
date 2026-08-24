@@ -12,6 +12,7 @@ import { sendEmailWithRetry } from '../email/resend';
 import { emailTemplates } from '../email/templates';
 
 // Helper to fetch emails for user ID or role
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getEmailsForRecipients(adminClient: any, userId: string | null, role: string | null): Promise<string[]> {
   if (userId) {
     const { data } = await adminClient.from('users').select('email').eq('id', userId).single();
@@ -19,6 +20,7 @@ async function getEmailsForRecipients(adminClient: any, userId: string | null, r
   }
   if (role) {
     const { data } = await adminClient.from('users').select('email').eq('role', role);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return data ? data.map((u: any) => u.email) : [];
   }
   return [];

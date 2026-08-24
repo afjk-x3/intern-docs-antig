@@ -2,7 +2,6 @@ import { getOwnSignaturePreviewUrl, enrollSignature } from '@lib/data/signatures
 import { createClient } from '@lib/supabase/server';
 import { SignaturePad } from '@/components/SignaturePad';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 
 export default async function ApproverSignaturePage() {
   const supabase = await createClient();

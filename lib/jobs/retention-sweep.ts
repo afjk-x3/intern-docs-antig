@@ -53,7 +53,7 @@ export async function runRetentionSweep() {
       }
     } else {
       // 30 days after internship end for non-approved items
-      // @ts-ignore
+      // @ts-expect-error nested field mapping
       const internshipEnd = sub.users?.internship_end;
       if (internshipEnd) {
         deletionDate = new Date(internshipEnd);
@@ -65,9 +65,9 @@ export async function runRetentionSweep() {
 
     const diffDays = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     
-    // @ts-ignore
+    // @ts-expect-error nested field mapping
     const internEmail = sub.users?.email;
-    // @ts-ignore
+    // @ts-expect-error nested field mapping
     const reqName = sub.requirements?.name || 'Document';
 
     // Send warnings if exact day match and not already sent

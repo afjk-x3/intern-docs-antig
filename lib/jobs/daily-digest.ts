@@ -5,7 +5,7 @@ import { emailTemplates } from '../email/templates';
 // Helper to count working days between two dates
 function getWorkingDays(startDate: Date, endDate: Date): number {
   let count = 0;
-  let current = new Date(startDate);
+  const current = new Date(startDate);
   
   while (current <= endDate) {
     const dayOfWeek = current.getDay();
@@ -48,7 +48,7 @@ export async function runDailyDigest() {
     const waitingDays = getWorkingDays(lastUpdate, now);
     
     // Default SLA is 2 days if not specified in routing template
-    // @ts-ignore
+    // @ts-expect-error nested field mapping
     const sla = sub.requirements?.routing_templates?.sla_days || 2;
 
     if (waitingDays > sla) {
@@ -59,9 +59,9 @@ export async function runDailyDigest() {
       
       if (waitingDays > sla + 5) {
         adminEscalations.push({
-          // @ts-ignore
+          // @ts-expect-error nested field mapping
           internEmail: sub.users?.email || 'Unknown',
-          // @ts-ignore
+          // @ts-expect-error nested field mapping
           reqName: sub.requirements?.name || 'Document',
         });
       }

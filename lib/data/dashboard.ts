@@ -1,7 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '../supabase/admin';
 import { createClient } from '../supabase/server';
-import { SubmissionState } from '../state-machine';
 
 export interface DashboardIntern {
   id: string;
@@ -76,7 +75,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     requirement_id: sub.requirement_id,
     state: sub.state,
     current_holder_id: sub.current_holder_id,
-    // @ts-ignore
+    // @ts-expect-error nested field mapping
     current_holder_email: sub.users?.email || null,
   }));
 

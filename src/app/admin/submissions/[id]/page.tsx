@@ -35,9 +35,11 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
 
   // Find active version
   const versions = submission.submission_versions || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeVersion = versions.find((v: any) => !v.is_superseded) || versions[0];
   
   // Sort approvals
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const approvals = (submission.approvals || []).sort((a: any, b: any) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -102,6 +104,7 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
               <p className="text-sm text-text-muted italic">No approvals recorded.</p>
             ) : (
               <div className="space-y-4">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {approvals.map((appr: any) => (
                   <div key={appr.id} className="bg-surface-muted border border-border-default rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
