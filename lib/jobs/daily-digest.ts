@@ -57,7 +57,7 @@ export async function runDailyDigest() {
 
   const approverReminders = new Map<string, number>(); // approver_id -> count
   const adminEscalations: { internEmail: string; reqName: string }[] = [];
-  const notificationsToInsert: any[] = [];
+  const notificationsToInsert: Record<string, unknown>[] = [];
 
   for (const sub of submissions) {
     const lastUpdate = new Date(sub.updated_at || sub.created_at);
