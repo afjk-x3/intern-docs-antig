@@ -21,6 +21,10 @@ export interface ApproverQueueItem {
   users?: { id: string; email: string };
   requirements?: RequirementRecord | null;
   activeVersion: SubmissionVersionRecord | null;
+  totalSteps?: number;
+  stepRole?: string;
+  canUserApprove?: boolean;
+  disabledReason?: string | null;
 }
 
 export interface ApproverUser {
@@ -237,7 +241,14 @@ export function ApproverQueue({
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <StatusBadge state={sub.state} isOverdue={sub.isOverdue} />
+                        <div className="space-y-1">
+                          <StatusBadge state={sub.state} isOverdue={sub.isOverdue} />
+                          {sub.totalSteps && sub.totalSteps > 1 && (
+                            <span className="block text-[10px] font-mono font-bold text-slate-500">
+                              Step {sub.current_step} of {sub.totalSteps} ({sub.stepRole === 'admin' ? 'Admin Review' : 'Supervisor'})
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
                         <button
@@ -259,26 +270,43 @@ export function ApproverQueue({
                         </button>
                         <button
                           onClick={() => openReassignModal(sub)}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                          disabled={sub.canUserApprove === false && sub.stepRole === 'admin'}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           title="Reassign to another approver"
                         >
                           Reassign
                         </button>
                         <button
                           onClick={() => openReturnModal(sub)}
-                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 transition-colors"
+                          disabled={sub.canUserApprove === false && sub.stepRole === 'admin'}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                           Return
                         </button>
-                        <button
-                          onClick={() => openApproveModal(sub)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                          Sign & Approve
-                        </button>
+                        {sub.canUserApprove === false ? (
+                          <button
+                            type="button"
+                            disabled
+                            title={sub.disabledReason || 'Awaiting Admin Final Approval'}
+                            className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold cursor-not-allowed inline-flex items-center gap-1.5 opacity-90"
+                          >
+                            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {sub.disabledReason || 'Awaiting Admin Approval'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openApproveModal(sub)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 shadow-xs"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            {sub.totalSteps && sub.totalSteps > 1 && sub.current_step === 1 ? 'Approve Step 1' : 'Sign & Approve'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

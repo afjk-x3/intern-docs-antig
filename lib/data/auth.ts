@@ -24,10 +24,13 @@ export async function inviteUser(email: string, role: string) {
     .from('users')
     .select('role')
     .eq('id', currentUser.id)
-    .single();
-
   if (roleError || !['admin', 'system_admin'].includes(currentDbUser?.role)) {
     throw new Error('Unauthorized');
+  }
+
+  // Enforce PRD boundary: Admin can ONLY invite interns. Approver & Admin invites require system_admin.
+  if (currentDbUser.role === 'admin' && role !== 'intern') {
+    throw new Error('Forbidden: Administrators can only invite interns. Inviting staff roles requires System Administrator privileges.');
   }
 
   const parsed = inviteSchema.parse({ email, role });

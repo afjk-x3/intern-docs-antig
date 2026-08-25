@@ -2,13 +2,26 @@
 
 import React, { useState } from 'react';
 
-interface AdminInviteFormProps {
-  onInviteAction: (formData: FormData) => Promise<{ success?: boolean; error?: string; inviteLink?: string | null }>;
+export interface RoleOption {
+  value: string;
+  label: string;
 }
 
-export function AdminInviteForm({ onInviteAction }: AdminInviteFormProps) {
+interface AdminInviteFormProps {
+  onInviteAction: (formData: FormData) => Promise<{ success?: boolean; error?: string; inviteLink?: string | null }>;
+  allowedRoles?: RoleOption[];
+}
+
+export function AdminInviteForm({
+  onInviteAction,
+  allowedRoles = [
+    { value: 'intern', label: 'Intern' },
+    { value: 'approver', label: 'Approver' },
+    { value: 'admin', label: 'Admin' },
+  ],
+}: AdminInviteFormProps) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('intern');
+  const [role, setRole] = useState(allowedRoles[0]?.value || 'intern');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ email: string; role: string; inviteLink?: string | null } | null>(null);
@@ -20,9 +33,10 @@ export function AdminInviteForm({ onInviteAction }: AdminInviteFormProps) {
     setSuccessInfo(null);
     setCopied(false);
 
+    const targetRole = allowedRoles.length === 1 ? allowedRoles[0].value : role;
     const formData = new FormData();
     formData.set('email', email);
-    formData.set('role', role);
+    formData.set('role', targetRole);
 
     setIsSubmitting(true);
     try {
@@ -31,7 +45,7 @@ export function AdminInviteForm({ onInviteAction }: AdminInviteFormProps) {
 
       setSuccessInfo({
         email,
-        role,
+        role: targetRole,
         inviteLink: res.inviteLink || null,
       });
       setEmail('');
@@ -52,16 +66,22 @@ export function AdminInviteForm({ onInviteAction }: AdminInviteFormProps) {
   };
 
   return (
-    <div className="bg-surface-bg p-6 rounded-xl shadow-xs border border-border-default space-y-4 max-w-3xl">
+    <div className="bg-surface-bg p-6 rounded-2xl shadow-xs border border-border-default space-y-4 max-w-3xl">
       <div>
-        <h2 className="text-base font-bold text-text-primary">Invite New User</h2>
+        <h2 className="text-base font-bold text-text-primary">
+          {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
+            ? 'Invite Cohort Intern'
+            : 'Invite New User'}
+        </h2>
         <p className="text-xs text-text-muted mt-0.5">
-          Send an onboarding invitation with assigned organizational role.
+          {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
+            ? 'Send an onboarding invitation link to a new intern in the cohort.'
+            : 'Send an onboarding invitation with assigned organizational role.'}
         </p>
       </div>
 
       {errorMsg && (
-        <div className="rounded-lg bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+        <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
           {errorMsg}
         </div>
       )}
@@ -105,27 +125,34 @@ export function AdminInviteForm({ onInviteAction }: AdminInviteFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="user@makerspace.ph"
-            className="w-full border border-border-default rounded-lg p-2 text-xs text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
+            placeholder="intern@makerspace.ph"
+            className="w-full border border-border-default rounded-xl p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
           />
         </div>
         <div>
           <label className="block text-xs font-semibold text-text-primary mb-1">Role</label>
           <select
             value={role}
+            disabled={allowedRoles.length <= 1}
             onChange={(e) => setRole(e.target.value)}
-            className="w-full border border-border-default rounded-lg p-2 text-xs text-text-primary focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
+            className={`w-full border border-border-default rounded-xl p-2.5 text-xs text-text-primary outline-none ${
+              allowedRoles.length <= 1
+                ? 'bg-slate-100 text-slate-600 cursor-not-allowed font-medium'
+                : 'focus:ring-1 focus:ring-brand-primary focus:border-brand-primary'
+            }`}
           >
-            <option value="intern">Intern</option>
-            <option value="approver">Approver</option>
-            <option value="admin">Admin</option>
+            {allowedRoles.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex items-end">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
+            className="w-full bg-brand-primary text-white py-2.5 px-4 rounded-xl text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors shadow-xs"
           >
             {isSubmitting ? 'Generating Invite...' : 'Send Invite'}
           </button>

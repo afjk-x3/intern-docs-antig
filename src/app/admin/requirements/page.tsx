@@ -1,6 +1,6 @@
 import { getRequirements, createRequirement } from '@lib/data/requirements';
-import { getRoutingTemplates, createRoutingTemplate } from '@lib/data/routing';
-import { AdminRequirementManager, CreateRequirementInput, CreateRoutingTemplateInput } from '@/components/AdminRequirementManager';
+import { getRoutingTemplates } from '@lib/data/routing';
+import { AdminRequirementManager, CreateRequirementInput } from '@/components/AdminRequirementManager';
 
 export default async function RequirementsPage() {
   const [requirements, routingTemplates] = await Promise.all([
@@ -17,18 +17,10 @@ export default async function RequirementsPage() {
       });
       return { success: true };
     } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'issues' in e && Array.isArray((e as { issues: Array<{ message: string }> }).issues)) {
+        return { error: (e as { issues: Array<{ message: string }> }).issues[0]?.message || 'Please check the requirement form details.' };
+      }
       const msg = e instanceof Error ? e.message : 'Failed to create requirement';
-      return { error: msg };
-    }
-  }
-
-  async function handleCreateTpl(data: CreateRoutingTemplateInput) {
-    'use server';
-    try {
-      await createRoutingTemplate(data);
-      return { success: true };
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to create template';
       return { error: msg };
     }
   }
@@ -44,7 +36,6 @@ export default async function RequirementsPage() {
         requirements={requirements}
         routingTemplates={routingTemplates}
         onCreateRequirement={handleCreateReq}
-        onCreateTemplate={handleCreateTpl}
       />
     </div>
   );

@@ -14,44 +14,46 @@ export interface CreateRequirementInput {
 
 export interface CreateRoutingTemplateInput {
   name: string;
-  steps: Array<{ step: number; role: 'approver' | 'admin' | 'system_admin'; name: string }>;
+  steps: Array<{ step: number; role: 'approver' | 'admin'; name: string }>;
   sla_days: number;
 }
 
-export interface RoutingTemplate {
+interface Requirement {
   id: string;
   name: string;
-  steps: Array<{ step: number; role?: string; user_id?: string; name?: string }>;
-  sla_days: number;
-}
-
-export interface Requirement {
-  id: string;
-  name: string;
-  description: string;
+  description?: string | null;
   accepted_types: string[];
   max_size_mb: number;
-  due_date_type: string;
+  due_date_type: 'fixed' | 'relative';
   due_date_value: string;
+  routing_template_id?: string | null;
   version_number: number;
-  routing_templates?: RoutingTemplate | null;
+  routing_templates?: {
+    id: string;
+    name: string;
+    sla_days?: number | null;
+  } | null;
+}
+
+interface RoutingTemplate {
+  id: string;
+  name: string;
+  steps: Array<{ step: number; role?: string; user_id?: string; name: string }>;
+  sla_days?: number | null;
 }
 
 interface AdminRequirementManagerProps {
   requirements: Requirement[];
   routingTemplates: RoutingTemplate[];
   onCreateRequirement: (data: CreateRequirementInput) => Promise<{ success?: boolean; error?: string }>;
-  onCreateTemplate: (data: CreateRoutingTemplateInput) => Promise<{ success?: boolean; error?: string }>;
 }
 
 export function AdminRequirementManager({
   requirements,
   routingTemplates,
   onCreateRequirement,
-  onCreateTemplate,
 }: AdminRequirementManagerProps) {
   const [showReqModal, setShowReqModal] = useState(false);
-  const [showTplModal, setShowTplModal] = useState(false);
 
   // Requirement form state
   const [name, setName] = useState('');
@@ -60,15 +62,20 @@ export function AdminRequirementManager({
   const [maxSizeMb, setMaxSizeMb] = useState(20);
   const [dueDateType, setDueDateType] = useState<'fixed' | 'relative'>('relative');
   const [dueDateValue, setDueDateValue] = useState('30');
-  const [routingTemplateId, setRoutingTemplateId] = useState(routingTemplates[0]?.id || '');
-
-  // Template form state
-  const [tplName, setTplName] = useState('');
-  const [tplSlaDays, setTplSlaDays] = useState(2);
-  const [tplStepCount, setTplStepCount] = useState<1 | 2>(1);
+  const [routingTemplateId, setRoutingTemplateId] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowReqModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleTypeToggle = (type: string) => {
     if (acceptedTypes.includes(type)) {
@@ -105,56 +112,20 @@ export function AdminRequirementManager({
     }
   };
 
-  const handleTplSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMsg(null);
-    try {
-      const steps: Array<{ step: number; role: 'approver' | 'admin'; name: string }> = [
-        { step: 1, role: 'approver', name: 'Supervisor Review' },
-      ];
-      if (tplStepCount === 2) {
-        steps.push({ step: 2, role: 'admin', name: 'Admin Final Review' });
-      }
-
-      const res = await onCreateTemplate({
-        name: tplName,
-        steps,
-        sla_days: Number(tplSlaDays),
-      });
-      if (res.error) throw new Error(res.error);
-      setShowTplModal(false);
-      window.location.reload();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to create template';
-      setErrorMsg(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Action Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-text-primary">Requirement Definitions</h2>
-          <p className="text-xs text-text-muted">Configure document requirements and approval routing templates.</p>
+          <p className="text-xs text-text-muted">Configure document requirements and linked approval workflows.</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowTplModal(true)}
-            className="px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg text-xs font-semibold text-text-primary hover:bg-slate-50 transition-colors"
-          >
-            + New Routing Template
-          </button>
-          <button
-            onClick={() => setShowReqModal(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
-          >
-            + New Requirement
-          </button>
-        </div>
+        <button
+          onClick={() => setShowReqModal(true)}
+          className="px-3.5 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors shadow-xs"
+        >
+          + New Requirement
+        </button>
       </div>
 
       {/* Requirements List */}
@@ -162,26 +133,26 @@ export function AdminRequirementManager({
         {requirements.map((req) => (
           <div
             key={req.id}
-            className="bg-surface-bg border border-border-default rounded-xl p-5 shadow-xs space-y-3"
+            className="bg-surface-bg border border-border-default rounded-2xl p-5 shadow-xs space-y-3"
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="font-semibold text-sm text-text-primary">{req.name}</h3>
+                <h3 className="font-bold text-sm text-text-primary">{req.name}</h3>
                 <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                   Version {req.version_number}
                 </span>
               </div>
-              <span className="text-xs font-medium text-brand-primary bg-blue-50 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold text-brand-primary bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
                 {req.due_date_type === 'relative' ? `${req.due_date_value} days relative` : `Fixed: ${req.due_date_value}`}
               </span>
             </div>
 
             <p className="text-xs text-text-muted line-clamp-2">{req.description || 'No description'}</p>
 
-            <div className="text-[11px] text-text-muted bg-surface-muted p-2.5 rounded-lg flex justify-between items-center">
+            <div className="text-[11px] text-text-muted bg-surface-muted p-3 rounded-xl flex flex-wrap justify-between items-center gap-2">
               <span>Types: {req.accepted_types.map((t) => t.split('/')[1]?.toUpperCase()).join(', ')}</span>
               <span>Max: {req.max_size_mb} MB</span>
-              <span>Routing: {req.routing_templates?.name || 'Default'}</span>
+              <span className="font-medium text-slate-700">Routing: {req.routing_templates?.name || 'Default'}</span>
             </div>
           </div>
         ))}
@@ -189,20 +160,29 @@ export function AdminRequirementManager({
 
       {/* Create Requirement Modal */}
       {showReqModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center pb-3 border-b border-border-default">
               <h3 className="text-base font-bold text-text-primary">Create Requirement Definition</h3>
-              <button onClick={() => setShowReqModal(false)} className="text-text-muted hover:text-text-primary font-bold">✕</button>
+              <button
+                onClick={() => setShowReqModal(false)}
+                className="text-text-muted hover:text-text-primary font-bold p-1"
+              >
+                ✕
+              </button>
             </div>
 
             {errorMsg && (
-              <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-800 border border-rose-200">
+              <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
                 {errorMsg}
               </div>
             )}
 
-            <form onSubmit={handleReqSubmit} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleReqSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-text-primary mb-1">Requirement Name</label>
                 <input
@@ -211,7 +191,7 @@ export function AdminRequirementManager({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Mid-term Evaluation Form"
-                  className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                  className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                 />
               </div>
 
@@ -222,7 +202,7 @@ export function AdminRequirementManager({
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   placeholder="Instructions for the intern..."
-                  className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                  className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                 />
               </div>
 
@@ -231,8 +211,12 @@ export function AdminRequirementManager({
                   <label className="block font-semibold text-text-primary mb-1">Due Date Rule</label>
                   <select
                     value={dueDateType}
-                    onChange={(e) => setDueDateType(e.target.value as 'fixed' | 'relative')}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                    onChange={(e) => {
+                      const nextType = e.target.value as 'fixed' | 'relative';
+                      setDueDateType(nextType);
+                      setDueDateValue(nextType === 'relative' ? '30' : new Date().toISOString().split('T')[0]);
+                    }}
+                    className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                   >
                     <option value="relative">Relative to Internship Start</option>
                     <option value="fixed">Fixed Calendar Date</option>
@@ -248,7 +232,7 @@ export function AdminRequirementManager({
                     value={dueDateValue}
                     onChange={(e) => setDueDateValue(e.target.value)}
                     placeholder={dueDateType === 'relative' ? '30' : '2026-12-31'}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                    className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                   />
                 </div>
               </div>
@@ -259,8 +243,9 @@ export function AdminRequirementManager({
                   <select
                     value={routingTemplateId}
                     onChange={(e) => setRoutingTemplateId(e.target.value)}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                    className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                   >
+                    <option value="">Default (Single Supervisor Review)</option>
                     {routingTemplates.map((t) => (
                       <option key={t.id} value={t.id}>{t.name} (SLA: {t.sla_days}d)</option>
                     ))}
@@ -274,113 +259,58 @@ export function AdminRequirementManager({
                     max={50}
                     value={maxSizeMb}
                     onChange={(e) => setMaxSizeMb(Number(e.target.value))}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
+                    className="w-full rounded-xl border border-border-default p-2.5 text-text-primary focus:border-brand-primary outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-text-primary mb-1">Accepted File Types</label>
+                <label className="block font-semibold text-text-primary mb-1.5">Accepted File Types</label>
                 <div className="flex gap-4">
-                  {[
-                    { label: 'PDF', val: 'application/pdf' },
-                    { label: 'PNG', val: 'image/png' },
-                    { label: 'JPEG', val: 'image/jpeg' },
-                  ].map((t) => (
-                    <label key={t.val} className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTypes.includes(t.val)}
-                        onChange={() => handleTypeToggle(t.val)}
-                      />
-                      <span>{t.label}</span>
-                    </label>
-                  ))}
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTypes.includes('application/pdf')}
+                      onChange={() => handleTypeToggle('application/pdf')}
+                      className="rounded border-border-default text-brand-primary focus:ring-brand-primary cursor-pointer"
+                    />
+                    PDF
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTypes.includes('image/png')}
+                      onChange={() => handleTypeToggle('image/png')}
+                      className="rounded border-border-default text-brand-primary focus:ring-brand-primary cursor-pointer"
+                    />
+                    PNG
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTypes.includes('image/jpeg')}
+                      onChange={() => handleTypeToggle('image/jpeg')}
+                      className="rounded border-border-default text-brand-primary focus:ring-brand-primary cursor-pointer"
+                    />
+                    JPEG
+                  </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-border-default">
+              <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
                 <button
                   type="button"
                   onClick={() => setShowReqModal(false)}
-                  className="px-3 py-1.5 rounded text-text-muted hover:bg-slate-100 font-semibold"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-1.5 rounded bg-brand-primary text-white font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
                 >
                   {isSubmitting ? 'Creating...' : 'Create Requirement'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Create Routing Template Modal */}
-      {showTplModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default">
-            <div className="flex justify-between items-center pb-3 border-b border-border-default">
-              <h3 className="text-base font-bold text-text-primary">Create Routing Template</h3>
-              <button onClick={() => setShowTplModal(false)} className="text-text-muted hover:text-text-primary font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleTplSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-text-primary mb-1">Template Name</label>
-                <input
-                  type="text"
-                  required
-                  value={tplName}
-                  onChange={(e) => setTplName(e.target.value)}
-                  placeholder="e.g. Two-Tier Department Review"
-                  className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-text-primary mb-1">Number of Steps</label>
-                  <select
-                    value={tplStepCount}
-                    onChange={(e) => setTplStepCount(Number(e.target.value) as 1 | 2)}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
-                  >
-                    <option value={1}>1 Step (Approver)</option>
-                    <option value={2}>2 Steps (Approver + Admin)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-text-primary mb-1">SLA Target (Days)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={tplSlaDays}
-                    onChange={(e) => setTplSlaDays(Number(e.target.value))}
-                    className="w-full rounded border border-border-default p-2 text-text-primary focus:border-brand-primary outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-border-default">
-                <button
-                  type="button"
-                  onClick={() => setShowTplModal(false)}
-                  className="px-3 py-1.5 rounded text-text-muted hover:bg-slate-100 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-1.5 rounded bg-brand-primary text-white font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Template'}
                 </button>
               </div>
             </form>

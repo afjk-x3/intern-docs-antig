@@ -31,14 +31,15 @@ export default async function RootPage() {
 
   const role = userData?.role;
 
+  if (role === 'system_admin') redirect('/system-admin');
+  if (role === 'admin') redirect('/admin');
+  if (role === 'approver') redirect('/approver');
   if (role === 'intern') {
     if (!userData?.internship_start || !userData?.internship_end) {
       redirect('/onboarding');
     }
     redirect('/intern');
   }
-  if (role === 'approver') redirect('/approver');
-  if (role === 'admin' || role === 'system_admin') redirect('/admin');
 
   redirect('/onboarding');
 }

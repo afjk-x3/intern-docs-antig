@@ -260,7 +260,8 @@ export async function getApproverQueue() {
       routing_snapshot,
       users!submissions_intern_id_fkey(id, email),
       requirements(id, name, max_size_mb, accepted_types, signature_config, routing_templates(*)),
-      submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at)
+      submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at),
+      approvals(id, step, approver_id, created_at)
     `)
     .eq('state', SubmissionState.IN_REVIEW)
     .order('created_at', { ascending: true });
@@ -282,11 +283,42 @@ export async function getApproverQueue() {
     const isOverdue = dueDate ? dueDate.getTime() < now.getTime() : false;
     const waitingHours = Math.floor((now.getTime() - new Date(sub.updated_at || sub.created_at).getTime()) / (1000 * 60 * 60));
 
+    const steps = getRoutingSteps(sub).length > 0 ? getRoutingSteps(sub) : [{ step: 1, role: 'approver' as const }];
+    const totalSteps = steps.length;
+    const currentStep = sub.current_step || 1;
+    const currentStepConfig = steps.find((s) => s.step === currentStep) || { step: currentStep, role: 'approver' as const };
+    const stepRole = currentStepConfig.role || 'approver';
+
+    const alreadyApprovedByUser = (sub.approvals || []).some((a) => a.step === currentStep && a.approver_id === user.id);
+
+    let canUserApprove = true;
+    let disabledReason: string | null = null;
+
+    if (dbUser.role === 'approver') {
+      if (stepRole === 'admin' || currentStep > 1) {
+        canUserApprove = false;
+        disabledReason = 'Awaiting Admin Final Approval';
+      } else if (alreadyApprovedByUser) {
+        canUserApprove = false;
+        disabledReason = 'Step 1 Already Approved by You';
+      }
+    } else if (dbUser.role === 'admin' || dbUser.role === 'system_admin') {
+      if (alreadyApprovedByUser) {
+        canUserApprove = false;
+        disabledReason = 'Step Already Approved by You';
+      }
+    }
+
     return {
       ...sub,
       activeVersion,
       isOverdue,
       waitingHours,
+      totalSteps,
+      currentStep,
+      stepRole,
+      canUserApprove,
+      disabledReason,
     };
   });
 
@@ -693,6 +725,14 @@ export async function approveSubmissionSigned(submissionId: string) {
   );
   if (alreadyApprovedStep) {
     throw new Error('Idempotency error: You have already approved this step.');
+  }
+
+  const currentStepConfig = steps.find((s) => s.step === currentStep) || { step: currentStep, role: 'approver' as const };
+  const stepRequiredRole = currentStepConfig.role || 'approver';
+
+  // Guard: If current step requires an Administrator, approvers cannot sign/approve it (Admin final decision)
+  if (stepRequiredRole === 'admin' && role === UserRole.APPROVER) {
+    throw new Error('Forbidden: This step requires an Administrator to review and grant final approval.');
   }
 
   const action = isFinalStep ? 'APPROVE_FINAL' : 'APPROVE_INTERMEDIATE';

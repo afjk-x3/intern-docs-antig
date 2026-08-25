@@ -12,14 +12,18 @@ export default async function LoginPage({
 
   async function handleLogin(formData: FormData) {
     'use server';
-    
+    let isSuccess = false;
     try {
       const result = await login(formData);
       if (!result.success) throw new Error(result.error);
-      redirect('/');
+      isSuccess = true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Login failed';
       redirect(`/login?error=${encodeURIComponent(msg)}`);
+    }
+
+    if (isSuccess) {
+      redirect('/');
     }
   }
 

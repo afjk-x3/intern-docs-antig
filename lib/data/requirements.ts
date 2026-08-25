@@ -4,14 +4,19 @@ import { createAdminClient } from '../supabase/admin';
 import { z } from 'zod';
 import { headers } from 'next/headers';
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const requirementSchema = z.object({
   name: z.string().min(2, 'Requirement name must be at least 2 characters'),
   description: z.string().optional().default(''),
-  accepted_types: z.array(z.string()).min(1, 'At least one file type must be accepted'),
-  max_size_mb: z.number().int().min(1).max(50).default(20),
-  due_date_type: z.enum(['fixed', 'relative']),
-  due_date_value: z.string().min(1, 'Due date value is required'),
-  routing_template_id: z.string().uuid().optional().nullable(),
+  accepted_types: z.array(z.string()).min(1, 'Please select at least one accepted file type (PDF, PNG, or JPEG)'),
+  max_size_mb: z.number().int().min(1, 'Minimum file size is 1 MB').max(50, 'Maximum file size is 50 MB').default(20),
+  due_date_type: z.enum(['fixed', 'relative'], { message: 'Please select a valid due date type' }),
+  due_date_value: z.string().min(1, 'Please provide a due date value'),
+  routing_template_id: z.preprocess(
+    (val) => (typeof val === 'string' && uuidRegex.test(val) ? val : null),
+    z.string().uuid().nullable().optional()
+  ),
 });
 
 export async function getRequirements() {
