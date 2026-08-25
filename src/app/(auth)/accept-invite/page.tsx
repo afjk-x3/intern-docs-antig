@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 export default function AcceptInvitePage() {
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,7 +126,7 @@ export default function AcceptInvitePage() {
       }
 
       // 3. Redirect to dashboard/onboarding
-      window.location.href = '/';
+      router.push('/');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to set password. Please try again.';
       setErrorMsg(msg);
