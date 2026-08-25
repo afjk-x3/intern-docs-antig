@@ -1,0 +1,221 @@
+﻿
+> intern-docs-antig@0.1.0 lint
+> eslint
+
+
+C:\Users\pol\Documents\Projects\mih-tasks-2\dup\intern-docs-antig\lib\jobs\daily-digest.ts
+  60:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\pol\Documents\Projects\mih-tasks-2\dup\intern-docs-antig\src\app\(auth)\accept-invite\page.tsx
+  127:7  warning  Do not use `window.location.href` to navigate to internal Next.js pages. Use `redirect()` in the render phase, or `useRouter().push()` in Client Components' event handlers instead. See: https://nextjs.org/docs/messages/no-location-assign-relative-destination  @next/next/no-location-assign-relative-destination
+
+C:\Users\pol\Documents\Projects\mih-tasks-2\dup\intern-docs-antig\supabase\.temp\start-secrets\supabase_edge_runtime_intern-docs-antig\main\index.ts
+  1:1      error    Unexpected var, use let or const instead                               no-var
+  1:279    error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:299    error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:312    error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:366    warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:446    error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:510    error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:659    error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:674    error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:946    error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:1035   error    Unexpected var, use let or const instead                               no-var
+  1:1113   warning  'Vt' is assigned a value but never used                                @typescript-eslint/no-unused-vars
+  1:1144   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:1178   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:1210   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:1217   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:1267   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:1326   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:1433   error    Unexpected var, use let or const instead                               no-var
+  1:1721   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:1870   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:2203   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:2261   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:2537   error    Unexpected var, use let or const instead                               no-var
+  1:2605   error    Unexpected var, use let or const instead                               no-var
+  1:2703   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:2970   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:3201   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:3467   error    Unexpected var, use let or const instead                               no-var
+  1:3615   error    Unexpected var, use let or const instead                               no-var
+  1:4393   error    Unexpected var, use let or const instead                               no-var
+  1:4644   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:4654   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:4738   error    Unexpected var, use let or const instead                               no-var
+  1:5280   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:5436   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:5454   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:5474   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:5534   error    Unexpected var, use let or const instead                               no-var
+  1:6306   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:6353   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:6371   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:6500   error    Unexpected var, use let or const instead                               no-var
+  1:6553   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:6581   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:6881   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:7101   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:7110   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:7115   error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:7852   error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:7935   error    'a' is never reassigned. Use 'const' instead                           prefer-const
+  1:8129   error    Unexpected var, use let or const instead                               no-var
+  1:8270   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:8346   error    Unexpected var, use let or const instead                               no-var
+  1:8433   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:8464   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:8484   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:8521   error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:8526   error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:8567   error    'a' is never reassigned. Use 'const' instead                           prefer-const
+  1:8689   error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:8755   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:8819   error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:8824   warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:8906   error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:9063   error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:9090   error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:9127   error    Unexpected var, use let or const instead                               no-var
+  1:9699   error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:9749   error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:10260  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:10356  error    Unexpected var, use let or const instead                               no-var
+  1:10403  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:10513  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:10799  error    't' is never reassigned. Use 'const' instead                           prefer-const
+  1:10899  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:10970  error    Unexpected var, use let or const instead                               no-var
+  1:11278  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:11513  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:11522  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:11532  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:11542  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:11739  error    'm' is never reassigned. Use 'const' instead                           prefer-const
+  1:11911  error    'd' is never reassigned. Use 'const' instead                           prefer-const
+  1:12311  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:12359  error    'y' is never reassigned. Use 'const' instead                           prefer-const
+  1:12367  error    'N' is never reassigned. Use 'const' instead                           prefer-const
+  1:12471  error    'R' is never reassigned. Use 'const' instead                           prefer-const
+  1:12503  error    'x' is never reassigned. Use 'const' instead                           prefer-const
+  1:12798  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:12802  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:12806  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:12815  error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:12926  error    Unexpected var, use let or const instead                               no-var
+  1:13184  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:13269  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:13288  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:13458  error    Unexpected var, use let or const instead                               no-var
+  1:13647  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:13979  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:14112  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:14124  error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:14134  error    'a' is never reassigned. Use 'const' instead                           prefer-const
+  1:14145  error    'm' is never reassigned. Use 'const' instead                           prefer-const
+  1:14159  error    'c' is never reassigned. Use 'const' instead                           prefer-const
+  1:14164  error    'd' is never reassigned. Use 'const' instead                           prefer-const
+  1:14173  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:14285  error    'T' is never reassigned. Use 'const' instead                           prefer-const
+  1:14393  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:14575  error    'h' is never reassigned. Use 'const' instead                           prefer-const
+  1:14764  error    'N' is never reassigned. Use 'const' instead                           prefer-const
+  1:14769  error    'R' is never reassigned. Use 'const' instead                           prefer-const
+  1:14812  error    'x' is never reassigned. Use 'const' instead                           prefer-const
+  1:14837  error    'K' is never reassigned. Use 'const' instead                           prefer-const
+  1:14936  error    'S' is never reassigned. Use 'const' instead                           prefer-const
+  1:15051  error    'T' is never reassigned. Use 'const' instead                           prefer-const
+  1:15057  error    'Z' is never reassigned. Use 'const' instead                           prefer-const
+  1:15310  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:15396  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:15510  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:15690  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:15731  error    Unexpected var, use let or const instead                               no-var
+  1:15904  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:15910  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:15933  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:15941  error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:16205  error    'a' is never reassigned. Use 'const' instead                           prefer-const
+  1:16214  error    'm' is never reassigned. Use 'const' instead                           prefer-const
+  1:16254  error    'c' is never reassigned. Use 'const' instead                           prefer-const
+  1:16262  error    'd' is never reassigned. Use 'const' instead                           prefer-const
+  1:16328  error    'h' is never reassigned. Use 'const' instead                           prefer-const
+  1:16426  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:16497  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:16660  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:16672  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:16939  error    Unexpected var, use let or const instead                               no-var
+  1:16946  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:17041  error    Unexpected var, use let or const instead                               no-var
+  1:17094  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:17405  error    Unexpected var, use let or const instead                               no-var
+  1:17635  error    Unexpected var, use let or const instead                               no-var
+  1:17800  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:17808  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:18225  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:18233  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:18527  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:18720  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:18833  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:18983  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:18997  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:19338  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:19353  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:19528  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:19650  error    Unexpected var, use let or const instead                               no-var
+  1:21132  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:21502  error    Unexpected var, use let or const instead                               no-var
+  1:21522  error    't' is never reassigned. Use 'const' instead                           prefer-const
+  1:21550  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:21833  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:21849  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:21851  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:21916  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:21949  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:22105  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:22117  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:22254  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:22421  error    Unexpected var, use let or const instead                               no-var
+  1:22540  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:23247  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:23381  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:23398  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:23463  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:23598  error    'e' is never reassigned. Use 'const' instead                           prefer-const
+  1:23625  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:23719  error    'u' is never reassigned. Use 'const' instead                           prefer-const
+  1:23787  error    'o' is never reassigned. Use 'const' instead                           prefer-const
+  1:23912  error    'u' is never reassigned. Use 'const' instead                           prefer-const
+  1:23959  error    'w' is never reassigned. Use 'const' instead                           prefer-const
+  1:24108  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:24185  error    's' is never reassigned. Use 'const' instead                           prefer-const
+  1:24191  error    'a' is never reassigned. Use 'const' instead                           prefer-const
+  1:24221  error    'm' is never reassigned. Use 'const' instead                           prefer-const
+  1:24226  error    'c' is never reassigned. Use 'const' instead                           prefer-const
+  1:24314  warning  'w' is defined but never used                                          @typescript-eslint/no-unused-vars
+  1:24349  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:24474  error    'd' is never reassigned. Use 'const' instead                           prefer-const
+  1:24505  warning  'w' is defined but never used                                          @typescript-eslint/no-unused-vars
+  1:24564  error    'h' is never reassigned. Use 'const' instead                           prefer-const
+  1:24569  error    'y' is never reassigned. Use 'const' instead                           prefer-const
+  1:24574  error    'N' is never reassigned. Use 'const' instead                           prefer-const
+  1:24580  error    'R' is never reassigned. Use 'const' instead                           prefer-const
+  1:24586  error    'x' is never reassigned. Use 'const' instead                           prefer-const
+  1:24595  error    'K' is never reassigned. Use 'const' instead                           prefer-const
+  1:24632  error    'S' is never reassigned. Use 'const' instead                           prefer-const
+  1:24645  error    'T' is never reassigned. Use 'const' instead                           prefer-const
+  1:24662  error    'Z' is never reassigned. Use 'const' instead                           prefer-const
+  1:24689  error    'u' is never reassigned. Use 'const' instead                           prefer-const
+  1:25005  error    'w' is never reassigned. Use 'const' instead                           prefer-const
+  1:25071  error    'w' is never reassigned. Use 'const' instead                           prefer-const
+  1:25073  error    'Q' is never reassigned. Use 'const' instead                           prefer-const
+  1:25336  error    't' is never reassigned. Use 'const' instead                           prefer-const
+  1:25399  error    'r' is never reassigned. Use 'const' instead                           prefer-const
+  1:25415  error    'n' is never reassigned. Use 'const' instead                           prefer-const
+  1:25432  error    'i' is never reassigned. Use 'const' instead                           prefer-const
+  1:25501  error    's' is never reassigned. Use 'const' instead                           prefer-const
+
+Γ£û 207 problems (183 errors, 24 warnings)
+  117 errors and 0 warnings potentially fixable with the `--fix` option.
+
