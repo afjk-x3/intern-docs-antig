@@ -25,6 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Requirements', href: '/admin/requirements' },
     { label: 'Routing Templates', href: '/admin/routing-templates' },
+    { label: 'Final Approval', href: '/admin/final-approval' },
     { label: 'Users', href: '/admin/users' },
     ...(dbUser.role === 'system_admin'
       ? [{ label: 'System Admin Console ↗', href: '/system-admin' }]
