@@ -32,6 +32,7 @@ interface Requirement {
     id: string;
     name: string;
     sla_days?: number | null;
+    steps?: Array<{ step: number; role?: string; user_id?: string; name: string }>;
   } | null;
 }
 
@@ -149,10 +150,21 @@ export function AdminRequirementManager({
 
             <p className="text-xs text-text-muted line-clamp-2">{req.description || 'No description'}</p>
 
-            <div className="text-[11px] text-text-muted bg-surface-muted p-3 rounded-xl flex flex-wrap justify-between items-center gap-2">
-              <span>Types: {req.accepted_types.map((t) => t.split('/')[1]?.toUpperCase()).join(', ')}</span>
-              <span>Max: {req.max_size_mb} MB</span>
-              <span className="font-medium text-slate-700">Routing: {req.routing_templates?.name || 'Default'}</span>
+            <div className="text-[11px] text-text-muted bg-surface-muted p-3 rounded-xl space-y-2">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <span>Types: {req.accepted_types.map((t) => t.split('/')[1]?.toUpperCase()).join(', ')}</span>
+                <span>Max: {req.max_size_mb} MB</span>
+              </div>
+              <div className="pt-2 border-t border-border-default/60 flex flex-wrap items-center justify-between gap-1.5">
+                <span className="font-semibold text-text-primary">
+                  Workflow: {req.routing_templates?.name || 'Default (1-Step)'}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-border-default">
+                  Signatories: {req.routing_templates?.steps && req.routing_templates.steps.length > 0
+                    ? req.routing_templates.steps.map((s) => (s.role === 'admin' ? 'Admin' : 'Supervisor')).join(' → ')
+                    : 'Supervisor'}
+                </span>
+              </div>
             </div>
           </div>
         ))}

@@ -14,6 +14,7 @@ export interface ChecklistItem {
   isOverdue: boolean;
   activeVersion: SubmissionVersionRecord | null;
   latestApproval: ApprovalRecord | null;
+  approvals?: ApprovalRecord[];
   versions: SubmissionVersionRecord[];
   deletionDate?: string | null;
   deletionDaysRemaining?: number | null;
@@ -212,28 +213,42 @@ export function InternChecklist({
                 </div>
               </div>
 
-              {/* Due Date & SLA Metadata */}
-              <div className="mt-4 pt-3 border-t border-border-default flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
-                <div className="flex items-center gap-4">
-                  <span>
-                    <strong>Due:</strong>{' '}
-                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}
-                  </span>
-                  {item.daysRemaining !== null && item.state !== 'APPROVED' && (
-                    <span className={item.daysRemaining <= 3 ? 'text-rose-600 font-bold' : ''}>
-                      ({item.daysRemaining < 0 ? `${Math.abs(item.daysRemaining)} days overdue` : `${item.daysRemaining} days remaining`})
+              {/* Due Date, SLA & Signatories Metadata */}
+              <div className="mt-4 pt-3 border-t border-border-default space-y-2 text-xs text-text-muted">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>
+                      <strong>Due:</strong>{' '}
+                      {item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}
                     </span>
-                  )}
-                  {activeVer && (
-                    <span className="font-medium text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      Version {activeVer.version_number}
+                    {item.daysRemaining !== null && item.state !== 'APPROVED' && (
+                      <span className={item.daysRemaining <= 3 ? 'text-rose-600 font-bold' : ''}>
+                        ({item.daysRemaining < 0 ? `${Math.abs(item.daysRemaining)} days overdue` : `${item.daysRemaining} days remaining`})
+                      </span>
+                    )}
+                    {activeVer && (
+                      <span className="font-medium text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        Version {activeVer.version_number}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">
+                      Accepts: {req.accepted_types.map((t) => t.replace('image/', '').replace('application/', '.')).join(', ')} (Max {req.max_size_mb} MB)
                     </span>
-                  )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px]">
-                    Accepts: {req.accepted_types.map((t) => t.replace('image/', '').replace('application/', '.')).join(', ')} (Max {req.max_size_mb} MB)
+                {/* Workflow / Required Signatories */}
+                <div className="pt-1.5 border-t border-border-default/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                  <span className="text-slate-600">
+                    Template: <strong className="text-text-primary">{req.routing_templates?.name || 'Default Workflow'}</strong>
+                  </span>
+                  <span className="font-medium text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                    Required Signatories: {req.routing_templates?.steps && req.routing_templates.steps.length > 0
+                      ? req.routing_templates.steps.map((s) => (s.role === 'admin' ? 'Admin' : 'Supervisor')).join(' → ')
+                      : 'Supervisor (1-Step)'}
                   </span>
                 </div>
               </div>
@@ -248,18 +263,42 @@ export function InternChecklist({
                 </div>
               )}
 
-              {/* Approved Attestation Banner */}
+              {/* Approved Attestation Banner with Signed By Information */}
               {item.state === 'APPROVED' && latestAppr && (
-                <div className="mt-3 rounded-lg bg-emerald-50/80 p-2.5 text-xs border border-emerald-200 text-emerald-900 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-700 font-bold">✓ Digitally Signed & Approved</span>
-                    <span className="text-emerald-700 text-[11px]">
-                      on {new Date(latestAppr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                <div className="mt-3 rounded-xl bg-emerald-50/90 p-3 text-xs border border-emerald-200 text-emerald-950 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Digitally Signed & Approved
+                      </span>
+                      <span className="text-emerald-700 text-[11px]">
+                        on {new Date(latestAppr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                      ✓ Sealed & Verified
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded flex items-center gap-1">
-                    ✓ Sealed & Verified
-                  </span>
+
+                  {/* Signatures List */}
+                  <div className="pt-1.5 border-t border-emerald-200/60 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="font-semibold text-emerald-950">Signed by:</span>
+                    {item.approvals && item.approvals.length > 0 ? (
+                      item.approvals.map((appr, idx) => (
+                        <span key={appr.id || idx} className="inline-flex items-center gap-1.5 bg-white/95 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs font-mono text-[11px] text-emerald-900">
+                          <span className="font-sans font-semibold text-emerald-800">
+                            {appr.step ? `Step ${appr.step}:` : `Step ${idx + 1}:`}
+                          </span>
+                          <span>{appr.users?.email || (appr.step === 2 ? 'admin@makerspace.com' : 'supervisor@makerspace.com')}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="font-mono text-emerald-900">{latestAppr.users?.email || 'Authorized Signatory'}</span>
+                    )}
+                  </div>
                 </div>
               )}
 

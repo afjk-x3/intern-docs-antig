@@ -75,6 +75,7 @@ export async function createRequirement(input: z.infer<typeof requirementSchema>
       due_date_value: parsed.due_date_value,
       routing_template_id: parsed.routing_template_id || null,
       version_number: 1,
+      signature_config: { page: 'last', x: 380, y: 80, width: 160, height: 60 },
     })
     .select()
     .single();

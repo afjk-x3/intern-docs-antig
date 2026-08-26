@@ -156,7 +156,7 @@ export async function getInternChecklist() {
       created_at,
       updated_at,
       submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at),
-      approvals(id, step, file_hash, signed_pdf_url, created_at)
+      approvals(id, step, approver_id, file_hash, signed_pdf_url, created_at, users(id, email, role))
     `)
     .eq('intern_id', user.id);
 
@@ -187,7 +187,10 @@ export async function getInternChecklist() {
       (a, b) => b.version_number - a.version_number
     );
     const activeVersion = versions.find((v) => !v.is_superseded) || versions[0] || null;
-    const latestApproval = (sub?.approvals || []).sort(
+    const approvals = (sub?.approvals || []).sort(
+      (a, b) => a.step - b.step || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const latestApproval = [...approvals].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )[0] || null;
 
@@ -217,6 +220,7 @@ export async function getInternChecklist() {
       isOverdue,
       activeVersion,
       latestApproval,
+      approvals,
       versions,
       deletionDate: deletionDate ? deletionDate.toISOString() : null,
       deletionDaysRemaining,
@@ -747,50 +751,84 @@ export async function approveSubmissionSigned(submissionId: string) {
   let signedPdfStoragePath: string | null = null;
   let finalFileHash = activeVersion.file_hash;
 
-  if (isFinalStep) {
-    // 1. Download original submitted file from private storage
-    const { data: originalFileBlob, error: downloadErr } = await adminClient.storage
-      .from('submissions')
-      .download(activeVersion.file_url);
+  // 1. Download original submitted file from private storage
+  const { data: originalFileBlob, error: downloadErr } = await adminClient.storage
+    .from('submissions')
+    .download(activeVersion.file_url);
 
-    if (downloadErr || !originalFileBlob) {
-      throw new Error(`Failed to load submitted document for compositing: ${downloadErr?.message}`);
+  if (downloadErr || !originalFileBlob) {
+    throw new Error(`Failed to load submitted document for compositing: ${downloadErr?.message}`);
+  }
+
+  const originalFileBuffer = Buffer.from(await originalFileBlob.arrayBuffer());
+
+  // 2. Collect all signatories up to this step for compositing
+  const signatories: Array<{
+    stepNumber?: number;
+    roleTitle?: string;
+    signaturePngBuffer: Buffer;
+    approverName: string;
+    approvalDate: Date;
+  }> = [];
+
+  // Include previous step approvals (e.g. Step 1 Supervisor)
+  const prevApprovals = (typedSub.approvals || []).sort((a, b) => a.step - b.step);
+  for (const prevAppr of prevApprovals) {
+    try {
+      const prevSigBuffer = await getSignatureBytesForCompositing(prevAppr.approver_id);
+      const { data: prevUserData } = await adminClient
+        .from('users')
+        .select('email, role')
+        .eq('id', prevAppr.approver_id)
+        .single();
+
+      signatories.push({
+        stepNumber: prevAppr.step,
+        roleTitle: prevAppr.step === 1 ? 'Supervisor Review:' : `Step ${prevAppr.step} Review:`,
+        signaturePngBuffer: prevSigBuffer,
+        approverName: prevUserData?.email || 'Supervisor',
+        approvalDate: new Date(prevAppr.created_at),
+      });
+    } catch (err) {
+      console.warn(`Could not load previous signature for step ${prevAppr.step}:`, err);
     }
+  }
 
-    const originalFileBuffer = Buffer.from(await originalFileBlob.arrayBuffer());
+  // Include current step approver signature
+  const currentSigBuffer = await getSignatureBytesForCompositing(user.id);
+  signatories.push({
+    stepNumber: currentStep,
+    roleTitle: isFinalStep && steps.length > 1 ? 'Final Admin Approval:' : (currentStep === 1 && steps.length > 1 ? 'Supervisor Review:' : 'Digitally Approved by:'),
+    signaturePngBuffer: currentSigBuffer,
+    approverName: dbUser.email || 'Authorized Signatory',
+    approvalDate: approvalDate,
+  });
 
-    // 2. Download approver's signature PNG from private storage
-    const signaturePngBuffer = await getSignatureBytesForCompositing(user.id);
+  // 3. Detect original mime type
+  const originalExt = activeVersion.file_url.split('.').pop()?.toLowerCase();
+  const originalMime = originalExt === 'png' ? 'image/png' : originalExt === 'jpg' || originalExt === 'jpeg' ? 'image/jpeg' : 'application/pdf';
 
-    // 3. Detect original mime type
-    const originalExt = activeVersion.file_url.split('.').pop()?.toLowerCase();
-    const originalMime = originalExt === 'png' ? 'image/png' : originalExt === 'jpg' || originalExt === 'jpeg' ? 'image/jpeg' : 'application/pdf';
+  // 4. Run server-side compositing (signature + printed name + date)
+  const compositeResult = await compositeSignedPdf({
+    originalFileBuffer,
+    originalMimeType: originalMime,
+    signatories,
+    config: typedSub.requirements?.signature_config,
+  });
 
-    // 4. Run server-side compositing (signature + printed name + date)
-    const approverName = dbUser.email || 'Authorized Signatory';
-    const compositeResult = await compositeSignedPdf({
-      originalFileBuffer,
-      originalMimeType: originalMime,
-      signaturePngBuffer,
-      approverName,
-      approvalDate,
-      config: typedSub.requirements?.signature_config,
+  finalFileHash = compositeResult.fileHash;
+
+  // 5. Store signed PDF as an immutable artifact
+  signedPdfStoragePath = `${typedSub.id}/v${activeVersion.version_number}_step${currentStep}_signed_${Date.now()}.pdf`;
+  const { error: signedUploadErr } = await adminClient.storage
+    .from('submissions')
+    .upload(signedPdfStoragePath, compositeResult.signedPdfBuffer, {
+      contentType: 'application/pdf',
+      upsert: false,
     });
 
-    finalFileHash = compositeResult.fileHash;
-
-    // 5. Store signed PDF as an immutable artifact (original stays untouched)
-    signedPdfStoragePath = `${typedSub.id}/v${activeVersion.version_number}_signed_${Date.now()}.pdf`;
-    const { error: signedUploadErr } = await adminClient.storage
-      .from('submissions')
-      .upload(signedPdfStoragePath, compositeResult.signedPdfBuffer, {
-        contentType: 'application/pdf',
-        upsert: false,
-      });
-
-    if (signedUploadErr) {
-      throw new Error(`Failed to store signed document: ${signedUploadErr.message}`);
-    }
+  if (signedUploadErr) {
+    throw new Error(`Failed to store signed document: ${signedUploadErr.message}`);
   }
 
   // Create approval record
@@ -1033,14 +1071,18 @@ export async function getSubmissionSignedDownloadUrl(submissionId: string, versi
   const targetVersion = versionId ? versions.find((v) => v.id === versionId) : versions.find((v) => !v.is_superseded) || versions[0];
   if (!targetVersion) throw new Error('Target version not found');
 
-  const latestApproval = approvals.find((a) => a.version_id === targetVersion.id) || approvals[0] || null;
+  const versionApprovals = approvals.filter((a) => a.version_id === targetVersion.id);
+  const sortedApprovals = [...versionApprovals].sort(
+    (a, b) => (b.step || 0) - (a.step || 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const latestApproval = sortedApprovals.find((a) => a.signed_pdf_url) || sortedApprovals[0] || approvals[0] || null;
 
-  // If approved and a signed PDF exists, download the signed PDF; otherwise download the submitted version
-  const filePathToDownload = (submission.state === SubmissionState.APPROVED && latestApproval?.signed_pdf_url)
+  // If approved (or signed PDF exists), download the signed PDF; otherwise download the submitted version
+  const filePathToDownload = ((submission.state === SubmissionState.APPROVED || latestApproval?.signed_pdf_url) && latestApproval?.signed_pdf_url)
     ? latestApproval.signed_pdf_url
     : targetVersion.file_url;
 
-  const expectedHash = (submission.state === SubmissionState.APPROVED && latestApproval)
+  const expectedHash = ((submission.state === SubmissionState.APPROVED || latestApproval?.signed_pdf_url) && latestApproval)
     ? latestApproval.file_hash
     : targetVersion.file_hash;
 

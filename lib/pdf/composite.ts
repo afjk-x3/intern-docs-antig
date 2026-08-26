@@ -10,12 +10,21 @@ export interface SignatureConfig {
   height?: number;
 }
 
-export interface CompositeParams {
-  originalFileBuffer: Buffer;
-  originalMimeType: string;
+export interface SignatoryEntry {
+  stepNumber?: number;
+  roleTitle?: string;
   signaturePngBuffer: Buffer;
   approverName: string;
   approvalDate: Date;
+}
+
+export interface CompositeParams {
+  originalFileBuffer: Buffer;
+  originalMimeType: string;
+  signaturePngBuffer?: Buffer;
+  approverName?: string;
+  approvalDate?: Date;
+  signatories?: SignatoryEntry[];
   config?: SignatureConfig;
 }
 
@@ -25,7 +34,7 @@ export interface CompositeResult {
 }
 
 /**
- * Composites an approver's signature PNG, printed name, and approval timestamp onto a document.
+ * Composites approver signature PNG(s), printed name(s), and approval timestamp(s) onto a document.
  * PRD FR-11 & Appendix B
  */
 export async function compositeSignedPdf({
@@ -34,6 +43,7 @@ export async function compositeSignedPdf({
   signaturePngBuffer,
   approverName,
   approvalDate,
+  signatories,
   config = {},
 }: CompositeParams): Promise<CompositeResult> {
   let pdfDoc: PDFDocument;
@@ -79,55 +89,92 @@ export async function compositeSignedPdf({
 
   const { width: pageWidth } = targetPage.getSize();
 
-  // Embed signature image
-  const signatureImage = await pdfDoc.embedPng(signaturePngBuffer);
-  const sigWidth = config.width || 140;
-  const sigHeight = config.height || (signatureImage.height * (sigWidth / signatureImage.width));
+  // Prepare list of signatories
+  const allSignatories: SignatoryEntry[] =
+    signatories && signatories.length > 0
+      ? signatories
+      : signaturePngBuffer && approverName && approvalDate
+      ? [
+          {
+            signaturePngBuffer,
+            approverName,
+            approvalDate,
+            roleTitle: 'Digitally Approved by:',
+          },
+        ]
+      : [];
 
-  // Coordinates (default: bottom right corner with margin)
-  const x = config.x !== undefined ? config.x : Math.max(20, pageWidth - sigWidth - 50);
-  const y = config.y !== undefined ? config.y : 60;
+  if (allSignatories.length === 0) {
+    throw new Error('No signature data provided for compositing.');
+  }
 
-  // Draw signature image
-  targetPage.drawImage(signatureImage, {
-    x,
-    y,
-    width: sigWidth,
-    height: sigHeight,
-  });
-
-  // Embed font for printed name and date
+  const totalSigs = allSignatories.length;
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontSize = 8;
 
-  // Format UTC date string
-  const dateStr = approvalDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+  for (let i = 0; i < totalSigs; i++) {
+    const sig = allSignatories[i];
+    const signatureImage = await pdfDoc.embedPng(sig.signaturePngBuffer);
+    const sigWidth = config.width || (totalSigs > 1 ? 120 : 140);
+    const sigHeight = config.height || (signatureImage.height * (sigWidth / signatureImage.width));
 
-  // Draw attestation metadata text below / alongside signature
-  targetPage.drawText(`Digitally Approved by:`, {
-    x,
-    y: Math.max(10, y - 10),
-    size: fontSize - 1,
-    font,
-    color: rgb(0.3, 0.3, 0.3),
-  });
+    let sigX: number;
+    let sigY: number;
 
-  targetPage.drawText(approverName, {
-    x,
-    y: Math.max(10, y - 20),
-    size: fontSize,
-    font: boldFont,
-    color: rgb(0.1, 0.2, 0.3),
-  });
+    if (totalSigs === 1) {
+      sigX = config.x !== undefined ? config.x : Math.max(20, pageWidth - sigWidth - 50);
+      sigY = config.y !== undefined ? config.y : 60;
+    } else {
+      // Multi-step (2-way approval): Step 1 on the left, Step 2 on the right
+      if (i === 0) {
+        sigX = 50;
+      } else {
+        sigX = Math.max(sigWidth + 80, pageWidth - sigWidth - 50);
+      }
+      sigY = config.y !== undefined ? config.y : 60;
+    }
 
-  targetPage.drawText(`Date: ${dateStr}`, {
-    x,
-    y: Math.max(10, y - 29),
-    size: fontSize - 1,
-    font,
-    color: rgb(0.3, 0.3, 0.3),
-  });
+    // Draw signature image
+    targetPage.drawImage(signatureImage, {
+      x: sigX,
+      y: sigY,
+      width: sigWidth,
+      height: sigHeight,
+    });
+
+    const dateStr = sig.approvalDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    const title =
+      sig.roleTitle ||
+      (totalSigs > 1
+        ? `Step ${sig.stepNumber || i + 1} (${i === 0 ? 'Supervisor' : 'Final Admin'}):`
+        : `Digitally Approved by:`);
+
+    // Draw attestation metadata text below signature
+    targetPage.drawText(title, {
+      x: sigX,
+      y: Math.max(10, sigY - 10),
+      size: fontSize - 1,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+
+    targetPage.drawText(sig.approverName, {
+      x: sigX,
+      y: Math.max(10, sigY - 20),
+      size: fontSize,
+      font: boldFont,
+      color: rgb(0.1, 0.2, 0.3),
+    });
+
+    targetPage.drawText(`Date: ${dateStr}`, {
+      x: sigX,
+      y: Math.max(10, sigY - 29),
+      size: fontSize - 1,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+  }
 
   // Save the modified PDF bytes
   const signedPdfBytes = await pdfDoc.save();
