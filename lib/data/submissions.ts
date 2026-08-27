@@ -4,7 +4,7 @@ import { createAdminClient } from '../supabase/admin';
 import { validateAndSealFile } from './file-validation';
 import { getSignatureBytesForCompositing, hasEnrolledSignature } from './signatures';
 import { compositeSignedPdf } from '../pdf/composite';
-import { SubmissionState, UserRole, validateTransition } from '../state-machine';
+import { SubmissionState, UserRole, validateTransition, IllegalTransitionError, type Action } from '../state-machine';
 import { z } from 'zod';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
@@ -28,6 +28,37 @@ async function getEmailsForRecipients(adminClient: any, userId: string | null, r
 
 const returnCommentSchema = z.string().min(10, 'Return comment must be at least 10 characters explaining what needs correction.');
 const reassignReasonSchema = z.string().min(10, 'Reassignment reason must be at least 10 characters.');
+
+/**
+ * FR-13 / FR-24: an illegal transition must be rejected with 409 AND written to the audit
+ * log as a denied attempt. Wraps validateTransition so every call site gets this for free.
+ */
+async function validateTransitionAudited(
+  adminClient: ReturnType<typeof createAdminClient>,
+  actorId: string | null,
+  targetId: string | null,
+  currentState: SubmissionState,
+  action: Action,
+  role: UserRole
+): Promise<SubmissionState> {
+  try {
+    return validateTransition(currentState, action, role);
+  } catch (err) {
+    if (err instanceof IllegalTransitionError && targetId) {
+      const reqHeaders = await headers();
+      const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+      await adminClient.from('audit_log').insert({
+        actor_id: actorId,
+        action: 'DENIED_TRANSITION',
+        target_id: targetId,
+        target_type: 'submissions',
+        source_ip: ip,
+        payload: { attempted_action: action, from_state: currentState, role },
+      });
+    }
+    throw err;
+  }
+}
 
 export interface RequirementRecord {
   id: string;
@@ -268,7 +299,10 @@ export async function getApproverQueue() {
       approvals(id, step, approver_id, created_at)
     `)
     .eq('state', SubmissionState.IN_REVIEW)
-    .order('created_at', { ascending: true });
+    // Sorted by the same timestamp the "wait time" column actually displays (waitingHours,
+    // below) -- sorting by created_at instead would visibly disagree with the displayed
+    // urgency after a reassignment or return/resubmit bumps updated_at.
+    .order('updated_at', { ascending: true });
 
   if (dbUser.role === 'approver') {
     query = query.or(`current_holder_id.eq.${user.id},current_holder_id.is.null`);
@@ -460,10 +494,14 @@ export async function uploadSubmission(formData: FormData) {
   const fileBuffer = Buffer.from(fileArrayBuffer);
   const validated = validateAndSealFile(fileBuffer, typedReq.accepted_types, typedReq.max_size_mb);
 
-  // Validate state transition from DRAFT to SUBMITTED to IN_REVIEW
-  validateTransition(SubmissionState.DRAFT, 'SUBMIT', UserRole.INTERN);
-
   const adminClient = createAdminClient();
+
+  // Validate state transition from DRAFT to SUBMITTED, then the system's automatic
+  // assignment of step 1 (SUBMITTED -> IN_REVIEW) -- both legs go through the state
+  // machine, not a direct state-column write.
+  await validateTransitionAudited(adminClient, user.id, null, SubmissionState.DRAFT, 'SUBMIT', UserRole.INTERN);
+  await validateTransitionAudited(adminClient, null, null, SubmissionState.SUBMITTED, 'ASSIGN_STEP', UserRole.SYSTEM_ADMIN);
+
   const dueDate = computeDueDate(typedReq, intern.internship_start);
 
   // Determine step 1 holder
@@ -601,8 +639,10 @@ export async function resubmitSubmission(formData: FormData) {
     throw new Error('Unauthorized.');
   }
 
+  const adminClient = createAdminClient();
+
   // Transition validation: Must be in RETURNED state
-  validateTransition(typedSub.state, 'RESUBMIT', UserRole.INTERN);
+  await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, 'RESUBMIT', UserRole.INTERN);
 
   const fileArrayBuffer = await file.arrayBuffer();
   const fileBuffer = Buffer.from(fileArrayBuffer);
@@ -611,8 +651,6 @@ export async function resubmitSubmission(formData: FormData) {
     typedSub.requirements?.accepted_types,
     typedSub.requirements?.max_size_mb
   );
-
-  const adminClient = createAdminClient();
 
   // Find max version number
   const existingVersions = typedSub.submission_versions || [];
@@ -649,7 +687,10 @@ export async function resubmitSubmission(formData: FormData) {
     is_superseded: false,
   });
 
-  // Reset submission state to IN_REVIEW at step 1
+  // Reset submission state to IN_REVIEW at step 1 -- the system's automatic
+  // re-assignment of step 1, same as the initial upload path.
+  await validateTransitionAudited(adminClient, null, typedSub.id, SubmissionState.SUBMITTED, 'ASSIGN_STEP', UserRole.SYSTEM_ADMIN);
+
   const steps = getRoutingSteps(typedSub);
   const step1 = steps.find((s) => s.step === 1) || { role: 'approver' };
   const step1HolderId = ('user_id' in step1 && step1.user_id) ? step1.user_id : null;
@@ -739,13 +780,14 @@ export async function approveSubmissionSigned(submissionId: string) {
     throw new Error('Forbidden: This step requires an Administrator to review and grant final approval.');
   }
 
+  const adminClient = createAdminClient();
+
   const action = isFinalStep ? 'APPROVE_FINAL' : 'APPROVE_INTERMEDIATE';
-  const nextState = validateTransition(typedSub.state, action, role);
+  const nextState = await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, action, role);
 
   const activeVersion = (typedSub.submission_versions || []).find((v) => !v.is_superseded) || (typedSub.submission_versions || [])[0];
   if (!activeVersion) throw new Error('No active version found to approve.');
 
-  const adminClient = createAdminClient();
   const approvalDate = new Date();
 
   let signedPdfStoragePath: string | null = null;
@@ -912,7 +954,8 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = dbUser?.role as UserRole;
 
-  if (!dbUser || !['admin', 'system_admin', 'approver'].includes(role)) {
+  // FR-15 / Appendix A: only an Administrator may reassign a step.
+  if (!dbUser || !['admin', 'system_admin'].includes(role)) {
     throw new Error('Unauthorized');
   }
 
@@ -927,10 +970,10 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
   if (subErr || !submission) throw new Error('Submission not found');
 
   const typedSub = submission as unknown as SubmissionWithRelations;
-  validateTransition(typedSub.state, 'REASSIGN', role);
+  const adminClient = createAdminClient();
+  await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, 'REASSIGN', role);
 
   const previousHolderId = typedSub.current_holder_id;
-  const adminClient = createAdminClient();
 
   // Update submission holder
   await adminClient
@@ -1006,12 +1049,11 @@ export async function returnSubmission(submissionId: string, comment: string) {
   if (subErr || !submission) throw new Error('Submission not found');
 
   const typedSub = submission as unknown as SubmissionWithRelations;
-  const nextState = validateTransition(typedSub.state, 'RETURN', role);
+  const adminClient = createAdminClient();
+  const nextState = await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, 'RETURN', role);
 
   const activeVersion = (typedSub.submission_versions || []).find((v) => !v.is_superseded) || (typedSub.submission_versions || [])[0];
   if (!activeVersion) throw new Error('No active version to return.');
-
-  const adminClient = createAdminClient();
 
   // Attach return comment permanently to active version
   await adminClient

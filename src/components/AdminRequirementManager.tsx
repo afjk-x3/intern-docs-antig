@@ -182,6 +182,7 @@ export function AdminRequirementManager({
               <h3 className="text-base font-bold text-text-primary">Create Requirement Definition</h3>
               <button
                 onClick={() => setShowReqModal(false)}
+                aria-label="Close dialog"
                 className="text-text-muted hover:text-text-primary font-bold p-1"
               >
                 ✕
@@ -189,7 +190,7 @@ export function AdminRequirementManager({
             </div>
 
             {errorMsg && (
-              <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+              <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
                 {errorMsg}
               </div>
             )}

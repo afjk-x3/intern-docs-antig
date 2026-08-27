@@ -20,6 +20,8 @@ export interface DashboardSubmission {
   state: string;
   current_holder_id: string | null;
   current_holder_email?: string | null;
+  due_date: string | null;
+  isOverdue: boolean;
 }
 
 export interface AdminDashboardData {
@@ -65,11 +67,13 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       requirement_id,
       state,
       current_holder_id,
+      due_date,
       users!submissions_current_holder_id_fkey(email)
     `);
 
   if (subError) throw new Error(`Failed to load submissions: ${subError.message}`);
 
+  const now = new Date();
   const formattedSubmissions = submissions.map(sub => ({
     intern_id: sub.intern_id,
     requirement_id: sub.requirement_id,
@@ -77,6 +81,10 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     current_holder_id: sub.current_holder_id,
     // @ts-expect-error nested field mapping
     current_holder_email: sub.users?.email || null,
+    due_date: sub.due_date,
+    isOverdue: sub.due_date
+      ? new Date(sub.due_date).getTime() < now.getTime() && sub.state !== 'APPROVED' && sub.state !== 'PURGED'
+      : false,
   }));
 
   const result = {

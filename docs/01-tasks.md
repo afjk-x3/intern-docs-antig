@@ -70,7 +70,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 
 ## Phase 5 — Hardening & Pilot (Week 7, FR-25, FR-26, NFRs)
 
-- [ ] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
+- [x] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
 - [ ] Privacy notice shown and acknowledged at first login, acknowledgement recorded
 - [ ] Full FR-26 adversarial suite green in CI, blocking merge:
   - intern reads another intern's submission

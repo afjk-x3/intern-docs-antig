@@ -152,7 +152,7 @@ export default function AcceptInvitePage() {
         </div>
 
         {errorMsg && (
-          <div className="rounded-xl bg-rose-50 p-3.5 text-xs text-rose-800 border border-rose-200">
+          <div role="alert" className="rounded-xl bg-rose-50 p-3.5 text-xs text-rose-800 border border-rose-200">
             {errorMsg}
           </div>
         )}
@@ -165,6 +165,7 @@ export default function AcceptInvitePage() {
             <input
               id="password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={12}
@@ -182,6 +183,7 @@ export default function AcceptInvitePage() {
             <input
               id="confirmPassword"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={12}

@@ -127,6 +127,7 @@ export default async function AdminFinalApprovalPage() {
           hasSignature={hasSignature}
           signaturePreviewUrl={signaturePreview.previewUrl}
           approversList={[]}
+          hideHeader
           onApproveAction={handleApprove}
           onReturnAction={handleReturn}
           onReassignAction={handleReassign}

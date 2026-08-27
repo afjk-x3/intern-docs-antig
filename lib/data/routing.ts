@@ -35,6 +35,12 @@ export async function getApproversList() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error('Not authenticated');
 
+  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
+  // FR-2: only approvers/admins need to enumerate other approvers (for the reassignment picker).
+  if (!dbUser || !['approver', 'admin', 'system_admin'].includes(dbUser.role)) {
+    throw new Error('Unauthorized');
+  }
+
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
     .from('users')

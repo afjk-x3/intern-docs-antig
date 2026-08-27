@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
+import { ConfirmAction } from '@/components/ConfirmAction';
 
 interface SignaturePadProps {
   currentSignatureUrl?: string | null;
@@ -21,6 +22,17 @@ export function SignaturePad({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  // Revoke the object URL created for an uploaded-file preview once it's no longer needed.
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewUrl && mode === 'upload') URL.revokeObjectURL(pendingPreviewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPreviewUrl]);
 
   // Canvas drawing setup
   useEffect(() => {
@@ -110,12 +122,12 @@ export function SignaturePad({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Validates the captured signature and opens the confirm-with-preview dialog;
+  // the actual save only happens from handleConfirmSave below.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-
-    const formData = new FormData();
 
     if (mode === 'canvas') {
       const canvas = canvasRef.current;
@@ -123,28 +135,45 @@ export function SignaturePad({
         setErrorMsg('Please draw your signature before saving.');
         return;
       }
-      const base64Data = canvas.toDataURL('image/png');
-      formData.set('signature_data', base64Data);
+      setPendingPreviewUrl(canvas.toDataURL('image/png'));
     } else {
       if (!uploadFile) {
         setErrorMsg('Please choose a PNG signature file to upload.');
         return;
       }
+      setPendingPreviewUrl(URL.createObjectURL(uploadFile));
+    }
+
+    setConfirmError(null);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmSave = async () => {
+    const formData = new FormData();
+
+    if (mode === 'canvas') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      formData.set('signature_data', canvas.toDataURL('image/png'));
+    } else {
+      if (!uploadFile) return;
       formData.set('file', uploadFile);
     }
 
     setIsSaving(true);
+    setConfirmError(null);
     try {
       const res = await onSaveSignature(formData);
       if (res.error) throw new Error(res.error);
 
+      setConfirmOpen(false);
       setSuccessMsg('Signature enrolled successfully!');
       setTimeout(() => {
         window.location.reload();
       }, 1200);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save signature.';
-      setErrorMsg(msg);
+      setConfirmError(msg);
     } finally {
       setIsSaving(false);
     }
@@ -201,9 +230,11 @@ export function SignaturePad({
           </div>
 
           {/* Mode Tabs */}
-          <div className="flex bg-surface-muted rounded-lg p-1 border border-border-default text-xs">
+          <div role="tablist" aria-label="Signature input method" className="flex bg-surface-muted rounded-lg p-1 border border-border-default text-xs">
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'canvas'}
               onClick={() => { setMode('canvas'); setErrorMsg(null); }}
               className={`px-3 py-1 rounded-md font-semibold transition-colors ${mode === 'canvas' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
                 }`}
@@ -212,6 +243,8 @@ export function SignaturePad({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'upload'}
               onClick={() => { setMode('upload'); setErrorMsg(null); }}
               className={`px-3 py-1 rounded-md font-semibold transition-colors ${mode === 'upload' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'
                 }`}
@@ -222,13 +255,13 @@ export function SignaturePad({
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-lg bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+          <div role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
             {errorMsg}
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
+          <div role="status" className="mb-4 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 border border-emerald-200">
             {successMsg}
           </div>
         )}
@@ -294,14 +327,52 @@ export function SignaturePad({
           <div className="flex justify-end pt-3 border-t border-border-default">
             <button
               type="submit"
-              disabled={isSaving}
               className="px-5 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors flex items-center gap-2"
             >
-              {isSaving ? 'Saving Signature...' : currentSignatureUrl ? 'Update Signature' : 'Save Signature'}
+              {currentSignatureUrl ? 'Update Signature' : 'Save Signature'}
             </button>
           </div>
         </form>
       </div>
+
+      <ConfirmAction
+        open={confirmOpen}
+        onOpenChange={(next) => {
+          if (isSaving) return;
+          setConfirmOpen(next);
+          if (!next && pendingPreviewUrl && mode === 'upload') {
+            URL.revokeObjectURL(pendingPreviewUrl);
+            setPendingPreviewUrl(null);
+          }
+        }}
+        title={currentSignatureUrl ? 'Replace your enrolled signature?' : 'Save this signature?'}
+        description={
+          currentSignatureUrl
+            ? 'This replaces the signature stamp used on every approval you sign from now on. Approvals you already signed keep their original stamp.'
+            : 'This is the stamp that will be composited onto documents when you approve them.'
+        }
+        confirmLabel={currentSignatureUrl ? 'Replace Signature' : 'Save Signature'}
+        isLoading={isSaving}
+        loadingLabel="Saving…"
+        error={confirmError}
+        onConfirm={handleConfirmSave}
+      >
+        {pendingPreviewUrl && (
+          <div>
+            <span className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">
+              Preview -- approximate size as stamped on an approved document:
+            </span>
+            <div className="h-24 flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-300 p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={pendingPreviewUrl}
+                alt="Signature preview"
+                className="max-h-full max-w-[220px] object-contain filter drop-shadow-xs"
+              />
+            </div>
+          </div>
+        )}
+      </ConfirmAction>
     </div>
   );
 }

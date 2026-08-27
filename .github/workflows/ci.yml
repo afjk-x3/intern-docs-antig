@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   build:
@@ -34,6 +34,11 @@ jobs:
         path: ./
         base: ${{ github.event.repository.default_branch }}
         head: HEAD
+
+    # Same rule set as the local pre-commit hook (.husky/pre-commit), so a bypassed
+    # local hook (--no-verify) still gets caught here (12-backend-security-rules.md §10).
+    - name: Secretlint
+      run: npx secretlint "**/*"
 
     - name: Run tests
       run: npm run test

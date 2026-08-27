@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { ConfirmAction } from '@/components/ConfirmAction';
 
 export interface ManagedUser {
   id: string;
@@ -21,6 +22,8 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [pendingChange, setPendingChange] = useState<{ user: ManagedUser; nextRole: string } | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -40,17 +43,30 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
     };
   }, [users]);
 
-  const handleRoleSubmit = async (e: React.FormEvent<HTMLFormElement>, userId: string) => {
+  const handleRoleFormSubmit = (e: React.FormEvent<HTMLFormElement>, user: ManagedUser) => {
     e.preventDefault();
-    setIsUpdating(userId);
-    setStatusMessage(null);
+    const formData = new FormData(e.currentTarget);
+    const nextRole = formData.get('role') as string;
+    if (nextRole === user.role) return;
+    setConfirmError(null);
+    setPendingChange({ user, nextRole });
+  };
+
+  const handleConfirmRoleChange = async () => {
+    if (!pendingChange) return;
+    const { user, nextRole } = pendingChange;
+    setIsUpdating(user.id);
+    setConfirmError(null);
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData();
+      formData.set('userId', user.id);
+      formData.set('role', nextRole);
       await onRoleChangeAction(formData);
+      setPendingChange(null);
       setStatusMessage(`Role successfully updated.`);
       setTimeout(() => setStatusMessage(null), 3000);
-    } catch {
-      setStatusMessage(`Failed to update role.`);
+    } catch (e: unknown) {
+      setConfirmError(e instanceof Error ? e.message : 'Failed to update role.');
     } finally {
       setIsUpdating(null);
     }
@@ -162,11 +178,14 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
                 </td>
                 <td className="py-3.5 px-4">
                   <form
-                    onSubmit={(e) => handleRoleSubmit(e, u.id)}
+                    onSubmit={(e) => handleRoleFormSubmit(e, u)}
                     className="flex items-center gap-2"
                   >
-                    <input type="hidden" name="userId" value={u.id} />
+                    <label htmlFor={`role-${u.id}`} className="sr-only">
+                      Change role for {u.email}
+                    </label>
                     <select
+                      id={`role-${u.id}`}
                       name="role"
                       defaultValue={u.role}
                       className="rounded-lg border border-border-default p-1.5 text-xs bg-white text-text-primary focus:border-brand-primary outline-none"
@@ -201,6 +220,32 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
           </tbody>
         </table>
       </div>
+
+      {pendingChange && (
+        <ConfirmAction
+          open={!!pendingChange}
+          onOpenChange={(open) => !open && setPendingChange(null)}
+          title="Change user role?"
+          description="This changes what the user can access immediately and is recorded in the audit log."
+          confirmLabel="Change Role"
+          variant="destructive"
+          isLoading={isUpdating === pendingChange.user.id}
+          loadingLabel="Saving…"
+          error={confirmError}
+          onConfirm={handleConfirmRoleChange}
+        >
+          <div className="rounded-xl bg-surface-muted border border-border-default p-3.5 text-sm space-y-1.5">
+            <div>
+              <strong className="text-text-primary">{pendingChange.user.email}</strong>
+            </div>
+            <div className="text-text-muted">
+              <strong className="text-rose-700">{pendingChange.user.role}</strong>
+              {' → '}
+              <strong className="text-emerald-700">{pendingChange.nextRole}</strong>
+            </div>
+          </div>
+        </ConfirmAction>
+      )}
     </div>
   );
 }

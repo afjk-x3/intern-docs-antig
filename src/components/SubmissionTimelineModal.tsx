@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import type { SubmissionWithRelations } from '../../lib/data/submissions';
 import { fetchSubmissionTimelineAction, fetchSubmissionDetailsAction } from '../app/actions/submissions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface TimelineEvent {
   id: string;
@@ -61,24 +62,16 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-surface-bg shadow-xl border border-border-default animate-in fade-in zoom-in-95 duration-150">
-        
-        <div className="p-6 border-b border-border-default flex justify-between items-start shrink-0">
-          <div>
-            <h3 className="text-lg font-bold text-text-primary">Submission Timeline</h3>
-            {submission && (
-              <p className="text-xs text-text-muted mt-1">
-                {submission.requirements?.name}
-              </p>
-            )}
-          </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-text-muted">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0" showCloseButton>
+        <DialogHeader className="p-6 border-b border-border-default shrink-0">
+          <DialogTitle>Submission Timeline</DialogTitle>
+          {submission && (
+            <p className="text-xs text-text-muted">
+              {submission.requirements?.name}
+            </p>
+          )}
+        </DialogHeader>
 
         <div className="p-6 overflow-y-auto flex-1">
           {isLoading ? (
@@ -136,7 +129,7 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

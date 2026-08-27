@@ -332,3 +332,72 @@ Not the QA gate sign-off record (`10-quality-report.md`) and not the refactor hi
 - [x] Freeze rule bypass resolved: The dropped client `UPDATE` policy on `public.submission_versions` successfully prevents users from altering `file_hash` or `file_url` post-approval.
 
 *Status*: **PASS**. The critical RLS vulnerabilities have been mitigated.
+
+## Audit — 2026-08-27 (Independent Re-verification) — Phases: 1–5 (pre-Phase-5 baseline)
+
+> Scope: re-verified Phases 1–4 end to end against actual code rather than trusting prior self-reported checkmarks in this document, then fixed everything found before this entry was written. Also establishes the Phase 5 starting line. Build: `npx tsc --noEmit` clean. `npm run lint` — 0 errors. `npx vitest run` — **39 passed, 0 failed** (7 test files).
+
+### Scope discipline
+- [x] Nothing built this pass is outside §6 Must/Should of the PRD
+- [x] No Could or Won't item has crept in without a change-control note in `13-plan-redo-organization.md`
+
+### Requirement traceability
+- [x] Every FR claimed "done" in `01-tasks.md` re-checked against code, not assumed
+  *CORRECTION*: the 2026-08-21 gap table (line 281 above) still listed gap #3 (digest dedup) and #4 (`audit_log.payload` missing) as open. Both were already fixed in code by the time of this pass — `lib/jobs/daily-digest.ts` dedupes per item per day via a `sentToday` set, and `20240101000009_audit_payload.sql` added the `payload` column, correctly populated by the CSV export path. This document itself had drifted from the code it describes; treat entries here as a snapshot, always re-verify against current code before relying on a PASS.
+
+### RLS coverage
+- [x] Every table holding user data has an RLS policy
+- [x] Spot-checked storage bucket policies specifically (not just table policies) — this is where the previous audit passes had a blind spot
+  *FAIL, now FIXED*: `20240101000002_phase2_requirements_submissions.sql` (re-created in `...0005_fix_storage_policies.sql:17-19`) defined the `submissions` bucket SELECT policy as `USING (bucket_id = 'submissions')` with **no ownership or holder scoping**, despite being named "read via signed URLs only." Any authenticated user could read any object in the bucket directly — FR-26 scenario 6 (direct storage access without a signed URL), unguarded. Fixed in `20240101000011_fix_submissions_storage_and_delete_policy.sql`: `USING (false)`, matching the `signatures` bucket's correct policy. Confirmed safe — every download path in `getSubmissionSignedDownloadUrl()` already falls back to the admin/service-role client.
+  *FAIL, now FIXED*: the same migration (`...0005`, lines 22-25) granted `DELETE` on `public.submissions` to `intern_id = auth.uid()` with **no state filter**, despite being named "delete own orphan submissions." Cascading FKs on `submission_versions`/`approvals` meant an intern could delete an `APPROVED` submission's full record via direct API, defeating FR-14/FR-23. Policy dropped in `20240101000011...`.
+
+### Audit log integrity
+- [x] `REVOKE UPDATE, DELETE, TRUNCATE` on `audit_log` confirmed still in force, no migration grants it back
+- [x] Illegal/denied transitions now write an audit entry (previously did not)
+  *FAIL, now FIXED*: FR-13/FR-24 require a denied transition to be audit-logged, not just rejected. `validateTransition()` only threw; no caller ever caught that to log it. Added `validateTransitionAudited()` in `lib/data/submissions.ts`, wired into all transition call sites (`uploadSubmission`, `resubmitSubmission`, `approveSubmissionSigned`, `returnSubmission`, `reassignApprover`) — a denied attempt now writes a `DENIED_TRANSITION` entry with the attempted action, from-state, and role.
+
+### State machine integrity
+- [x] Every state write goes through `lib/state-machine`, no direct column writes
+  *FAIL, now FIXED*: `lib/jobs/retention-sweep.ts` wrote `state: 'PURGED'` directly, bypassing the state machine entirely, and its eligibility check treated any non-`APPROVED` submission as purge-eligible 30 days after internship end — including `IN_REVIEW`, which has no legal `PURGE` transition in Appendix A. The job now calls `validateTransition` before every state write, only purges from `APPROVED`/`CANCELLED`/`EXPIRED`, and expires stalled `SUBMITTED`/`IN_REVIEW`/`RETURNED` submissions (via `EXPIRE`) instead of purging them directly.
+  *FAIL, now FIXED*: `ASSIGN_STEP` was defined in the state machine but never invoked anywhere — `uploadSubmission()`/`resubmitSubmission()` wrote `IN_REVIEW` directly after the `SUBMIT`/`RESUBMIT` check. Both now also validate the `SUBMITTED → IN_REVIEW` leg via `ASSIGN_STEP` before writing.
+  *FAIL, now FIXED*: `reassignApprover()` authorized the `approver` role in addition to `admin`/`system_admin`, contradicting FR-15 and Appendix A ("Who may trigger: Administrator"). `REASSIGN` is now Administrator-only in both `lib/state-machine/index.ts` and the app-level check; the Reassign button is hidden in the approver UI for non-admin approvers so it doesn't dead-end into an error.
+
+### Signature protection
+- [x] `signatures` bucket still `USING (false)` for client SELECT, never relaxed
+- [x] Compositing still server-side only via admin client; bytes never reach a response
+
+### Data findings this phase
+- [x] No new PII/sensitivity-raising fields
+- *FAIL, now FIXED*: `getApproversList()` had no role check — any authenticated intern could enumerate every approver/admin/system_admin email via the server action. Now requires `approver`/`admin`/`system_admin`.
+- Two correctness bugs fixed alongside (fail-closed, not security holes, but worth recording): `inviteUser()` was missing `.single()` on its role lookup, so the admin check always evaluated to an array and the function threw `Unauthorized` for every real admin; `login()`'s failed-attempt audit write used a non-existent `details` column instead of `payload`, silently dropping the attempted email.
+
+### CI / tooling gaps closed this pass
+- *FAIL, now FIXED*: `.github/workflows/ci.yml` triggered only on branch `main`, which does not exist in this repo (`master` is the actual default branch, confirmed via `git remote show origin`) — lint/typecheck/tests/secret-scan had never actually gated a merge. Fixed to trigger on `master`.
+- *GAP, now CLOSED*: `01-tasks.md` Phase 0 claimed "pre-commit secret scan" done, but only a CI-side trufflehog step existed — no local hook, so `git commit --no-verify` (or simply never running CI) bypassed it entirely. Added a `husky` pre-commit hook running `secretlint` on staged files, plus the same `secretlint` check as its own CI step, so a bypassed local hook is still caught server-side per `12-backend-security-rules.md` §10.
+
+### Notes — accessibility work done alongside (see `07-design-system.md`/`11-frontend-ui-rules.md` for the authoritative rules; recorded here only as a pointer)
+Installed shadcn/ui (`Dialog`, `Button`, and a new shared `ConfirmAction` component per `07-design-system.md` §5) and used them to fix: `StatusBadge` mislabelling `PURGED`/`CANCELLED`/`EXPIRED` submissions as "Not Started"; admin role changes firing with no confirmation; missing focus-trap/Escape/`aria-modal` on the approver's Approve/Return/Reassign dialogs, the timeline modal, and the intern upload modal. Also: dropped the Google Fonts load that contradicted the design doc's "system font stack" rule, added a global `prefers-reduced-motion` rule, added `role="alert"`/`aria-describedby` to error surfaces across most forms, replaced two raw `alert()` calls with inline dismissible error banners, added deletion-countdown visual escalation at 7/1 days, and swapped hardcoded hex colors on the login page for the existing brand-token classes (no visual change). Not done in this pass: the login page's layout still doesn't match `04-homepage-design-plan.md`'s single-column spec — flagged as a decision point for the team rather than changed unilaterally, since the current build looks like a deliberate, already-shipped design, not an obvious defect.
+
+### Notes — updated gap table (supersedes the 2026-08-21 table above)
+
+| # | Gap | FR | Severity | Status |
+|---|---|---|---|---|
+| 1 | Routing template not snapshotted per submission | FR-8 | Low | **Resolved** (`routing_snapshot`, confirmed still working) |
+| 2 | Old approver not emailed on reassignment (notification row exists, no email) | FR-18 | Low | Still open |
+| 3 | Digest has no per-item-per-day deduplication | FR-19 | Low | **Resolved** (confirmed in code, doc was stale) |
+| 4 | `audit_log` schema missing `payload` column | FR-21 | Medium | **Resolved** (confirmed in code, doc was stale) |
+| 5 | `submissions` storage bucket readable by any authenticated client, bypassing signed URLs | FR-25/FR-26 #6 | **Critical** | **Resolved** this pass |
+| 6 | Unscoped client DELETE policy on `submissions` (any state, including APPROVED) | FR-14/FR-23 | **Critical** | **Resolved** this pass |
+| 7 | Retention job bypassed the state machine, could purge `IN_REVIEW` submissions | FR-13/Appendix A | **Critical** | **Resolved** this pass |
+| 8 | `reassignApprover` authorized `approver` role, not admin-only | FR-15 | High | **Resolved** this pass |
+| 9 | Denied transitions not audit-logged | FR-13/FR-24 | Medium | **Resolved** this pass |
+| 10 | CI workflow targeted nonexistent `main` branch, never actually ran | NFR maintainability | High | **Resolved** this pass |
+| 11 | No local pre-commit secret scan despite Phase 0 claiming it done | 12-backend-security-rules.md §10 | Medium | **Resolved** this pass |
+| 12 | `getApproversList()` had no role check | FR-2 | Low | **Resolved** this pass |
+| 13 | FR-26 adversarial suite is entirely mock-based (no real Postgres/RLS execution) and covers only 2 of 7 mandated scenarios end to end | FR-26 | High | **Open — Phase 5 work** |
+| 14 | Playwright absent despite being locked into the stack | `01-tasks.md`, `02-dev-guide.md` | Medium | **Open — Phase 5 work** |
+| 15 | Privacy notice acknowledgment flow not implemented | FR-25 | High | **Open — Phase 5 work** |
+| 16 | No automated accessibility scan / documented manual keyboard pass performed | NFR accessibility | Medium | **Open — Phase 5 work** |
+
+### Phase 5 starting line
+Of the six `01-tasks.md` Phase 5 items: "Signed URLs for every download" is now genuinely true (gap #5 above closed the last hole in it) — recommend checking that box. The other five (privacy notice, full FR-26 suite green in CI, accessibility scan + keyboard pass, backup restore rehearsal, the 3–5 DTR pilot) are still open and are the next work.

@@ -1,0 +1,5 @@
+#!/bin/sh
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$staged" ]; then
+  echo "$staged" | xargs npx secretlint --maskSecrets
+fi

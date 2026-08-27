@@ -132,7 +132,7 @@ export function AdminRoutingTemplateManager({
 
         {routingTemplates.length === 0 && (
           <div className="col-span-full p-8 text-center bg-surface-bg border border-border-default rounded-2xl text-xs text-text-muted">
-            No custom routing templates configured yet. Click "+ New Routing Template" above to create one.
+            No custom routing templates configured yet. Click &quot;+ New Routing Template&quot; above to create one.
           </div>
         )}
       </div>
@@ -149,6 +149,7 @@ export function AdminRoutingTemplateManager({
               <h3 className="text-base font-bold text-text-primary">Create Routing Template</h3>
               <button
                 onClick={() => setShowModal(false)}
+                aria-label="Close dialog"
                 className="text-text-muted hover:text-text-primary font-bold p-1"
               >
                 ✕
@@ -156,7 +157,7 @@ export function AdminRoutingTemplateManager({
             </div>
 
             {errorMsg && (
-              <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+              <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
                 {errorMsg}
               </div>
             )}

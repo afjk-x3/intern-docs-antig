@@ -8,7 +8,7 @@ export interface AuditLogEntry {
   action: string;
   target_type: string;
   target_id: string | null;
-  ip_address: string | null;
+  source_ip: string | null;
   created_at: string;
   users: {
     id: string;
@@ -126,7 +126,7 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
       </div>
 
       {errorMsg && (
-        <div className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800 border border-rose-200 shadow-xs">
+        <div role="alert" className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800 border border-rose-200 shadow-xs">
           {errorMsg}
         </div>
       )}
@@ -182,7 +182,7 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-text-muted font-mono">
-                      {log.ip_address || '—'}
+                      {log.source_ip || '—'}
                     </td>
                   </tr>
                 ))

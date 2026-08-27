@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord, ApprovalRecord } from '@lib/data/submissions';
 import { SubmissionTimelineModal } from './SubmissionTimelineModal';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 export interface ChecklistItem {
   requirement: RequirementRecord;
@@ -41,6 +43,7 @@ export function InternChecklist({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const openUploadModal = (item: ChecklistItem) => {
     setSelectedItem(item);
@@ -65,6 +68,7 @@ export function InternChecklist({
 
   const handleDownload = async (submissionId: string) => {
     if (!onGetDownloadUrlAction) return;
+    setDownloadError(null);
     try {
       const res = await onGetDownloadUrlAction(submissionId);
       if (res.error) throw new Error(res.error);
@@ -73,7 +77,7 @@ export function InternChecklist({
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Download failed';
-      alert(`Download failed: ${msg}`);
+      setDownloadError(msg);
     }
   };
 
@@ -125,6 +129,23 @@ export function InternChecklist({
 
   return (
     <div className="w-full space-y-6">
+      {downloadError && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl bg-rose-50 p-3.5 text-xs text-rose-800 border border-rose-200"
+        >
+          <span>{downloadError}</span>
+          <button
+            type="button"
+            onClick={() => setDownloadError(null)}
+            aria-label="Dismiss error"
+            className="shrink-0 font-bold text-rose-600 hover:text-rose-800"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header Profile Summary */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-surface-bg p-6 rounded-xl border border-border-default shadow-xs">
         <div>
@@ -176,7 +197,7 @@ export function InternChecklist({
                   {item.state === 'RETURNED' && (
                     <button
                       onClick={() => openResubmitModal(item)}
-                      className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors"
+                      className="px-4 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
                     >
                       Re-upload Revision
                     </button>
@@ -302,82 +323,88 @@ export function InternChecklist({
                 </div>
               )}
 
-              {/* Deletion Countdown Banner */}
-              {item.deletionDaysRemaining !== undefined && item.deletionDaysRemaining !== null && item.deletionDaysRemaining < 14 && item.state !== 'PURGED' && activeVer && (
-                <div className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs border border-amber-200 text-amber-900 flex items-center gap-2">
-                  <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div>
-                    <strong>Data Retention Warning:</strong> This document will be permanently deleted from storage in {item.deletionDaysRemaining} days (on {new Date(item.deletionDate!).toLocaleDateString()}) per retention policy. Please download a copy for your records if needed.
+              {/* Deletion Countdown Banner -- escalates at 7 and 1 days, matching the FR-17 email warnings */}
+              {item.deletionDaysRemaining !== undefined && item.deletionDaysRemaining !== null && item.deletionDaysRemaining < 14 && item.state !== 'PURGED' && activeVer && (() => {
+                const days = item.deletionDaysRemaining!;
+                const critical = days <= 1;
+                const urgent = days <= 7;
+                const tone = critical
+                  ? 'bg-red-100 border-red-300 text-red-950'
+                  : urgent
+                  ? 'bg-amber-100 border-amber-300 text-amber-950'
+                  : 'bg-amber-50 border-amber-200 text-amber-900';
+                const iconTone = critical ? 'text-red-600' : 'text-amber-600';
+                return (
+                  <div role="alert" className={`mt-3 rounded-lg p-2.5 text-xs border flex items-center gap-2 ${tone} ${critical ? 'font-semibold' : ''}`}>
+                    <svg className={`h-4 w-4 shrink-0 ${iconTone} ${critical ? 'motion-safe:animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <strong>{critical ? 'Final Warning:' : 'Data Retention Warning:'}</strong> This document will be permanently deleted from storage in {days} {days === 1 ? 'day' : 'days'} (on {new Date(item.deletionDate!).toLocaleDateString()}) per retention policy. Please download a copy for your records if needed.
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           );
         })}
       </div>
 
       {/* Upload / Re-upload Modal */}
-      {selectedItem && modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-text-primary">
-              {modalMode === 'upload' ? `Submit ${selectedItem.requirement.name}` : `Re-upload Revision for ${selectedItem.requirement.name}`}
-            </h3>
-            <p className="text-xs text-text-muted mt-1">
-              Select your document to submit. Accepted formats: {selectedItem.requirement.accepted_types.join(', ')} (Max {selectedItem.requirement.max_size_mb} MB).
-            </p>
+      <Dialog open={!!selectedItem && !!modalMode} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent>
+          {selectedItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {modalMode === 'upload' ? `Submit ${selectedItem.requirement.name}` : `Re-upload Revision for ${selectedItem.requirement.name}`}
+                </DialogTitle>
+                <p className="text-xs text-text-muted">
+                  Select your document to submit. Accepted formats: {selectedItem.requirement.accepted_types.join(', ')} (Max {selectedItem.requirement.max_size_mb} MB).
+                </p>
+              </DialogHeader>
 
-            {uploadError && (
-              <div className="mt-4 rounded-lg bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
-                {uploadError}
-              </div>
-            )}
+              {uploadError && (
+                <div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+                  {uploadError}
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              <div className="border-2 border-dashed border-border-default hover:border-brand-primary rounded-xl p-6 text-center cursor-pointer transition-colors bg-surface-muted">
-                <input
-                  type="file"
-                  id="file-upload"
-                  onChange={handleFileChange}
-                  accept={selectedItem.requirement.accepted_types.join(',')}
-                  className="hidden"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-                  <svg className="h-10 w-10 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <span className="text-xs font-semibold text-text-primary">
-                    {selectedFile ? selectedFile.name : 'Click to browse or drag file here'}
-                  </span>
-                  <span className="text-[11px] text-text-muted mt-1">
-                    {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : `PDF, PNG, or JPEG up to ${selectedItem.requirement.max_size_mb} MB`}
-                  </span>
-                </label>
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="border-2 border-dashed border-border-default hover:border-brand-primary rounded-xl p-6 text-center cursor-pointer transition-colors bg-surface-muted">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    onChange={handleFileChange}
+                    accept={selectedItem.requirement.accepted_types.join(',')}
+                    className="hidden"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
+                    <svg className="h-10 w-10 text-text-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-xs font-semibold text-text-primary">
+                      {selectedFile ? selectedFile.name : 'Click to browse or drag file here'}
+                    </span>
+                    <span className="text-[11px] text-text-muted mt-1">
+                      {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : `PDF, PNG, or JPEG up to ${selectedItem.requirement.max_size_mb} MB`}
+                    </span>
+                  </label>
+                </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isUploading}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-text-muted hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUploading || !selectedFile}
-                  className="px-5 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
-                >
-                  {isUploading ? 'Uploading & Sealing...' : 'Upload & Submit'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                <DialogFooter>
+                  <Button type="button" variant="ghost" onClick={closeModal} disabled={isUploading}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isUploading || !selectedFile}>
+                    {isUploading ? 'Uploading & Sealing...' : 'Upload & Submit'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Timeline Modal */}
       {timelineSubId && (

@@ -81,13 +81,13 @@ export function AdminInviteForm({
       </div>
 
       {errorMsg && (
-        <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+        <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
           {errorMsg}
         </div>
       )}
 
       {successInfo && (
-        <div className="rounded-xl bg-emerald-50 p-4 border border-emerald-200 space-y-2.5">
+        <div role="status" className="rounded-xl bg-emerald-50 p-4 border border-emerald-200 space-y-2.5">
           <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
             <span>✓ Invitation generated for {successInfo.email} ({successInfo.role})!</span>
           </div>

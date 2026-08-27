@@ -24,7 +24,8 @@ export async function inviteUser(email: string, role: string) {
     .from('users')
     .select('role')
     .eq('id', currentUser.id)
-  if (roleError || !['admin', 'system_admin'].includes(currentDbUser?.role)) {
+    .single();
+  if (roleError || !currentDbUser || !['admin', 'system_admin'].includes(currentDbUser.role)) {
     throw new Error('Unauthorized');
   }
 
@@ -177,8 +178,8 @@ export async function login(formData: FormData) {
       action: 'LOGIN_FAILED',
       target_type: 'auth',
       source_ip: ip,
-      details: { attempted_email: email }
-      // email is stored in details, but never password
+      payload: { attempted_email: email }
+      // email is stored in payload, but never password
     });
 
     // Return a generic message — Supabase already returns generic errors,

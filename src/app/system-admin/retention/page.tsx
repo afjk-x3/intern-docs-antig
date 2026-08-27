@@ -1,5 +1,6 @@
 import { createAdminClient } from '@lib/supabase/admin';
 import { runRetentionSweep } from '@lib/jobs/retention-sweep';
+import { RunRetentionSweepButton } from '@/components/RunRetentionSweepButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,13 @@ export default async function SystemAdminRetentionPage() {
 
   async function handleManualSweep() {
     'use server';
-    await runRetentionSweep();
+    try {
+      await runRetentionSweep();
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Retention sweep failed.';
+      return { error: msg };
+    }
   }
 
   return (
@@ -40,14 +47,7 @@ export default async function SystemAdminRetentionPage() {
           </p>
         </div>
 
-        <form action={handleManualSweep}>
-          <button
-            type="submit"
-            className="px-4 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors shadow-xs"
-          >
-            ⚡ Run Retention Sweep Now
-          </button>
-        </form>
+        <RunRetentionSweepButton onRunSweepAction={handleManualSweep} />
       </div>
 
       {/* Retention Metrics */}
@@ -67,7 +67,7 @@ export default async function SystemAdminRetentionPage() {
         <div className="bg-surface-bg border border-border-default rounded-2xl p-5 shadow-xs space-y-1">
           <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Surviving Approval Records</span>
           <div className="text-2xl font-bold text-emerald-700">100%</div>
-          <p className="text-[11px] text-text-muted">Retained for $\ge 3$ years (FR-23)</p>
+          <p className="text-[11px] text-text-muted">Retained for at least 3 years (FR-23)</p>
         </div>
       </div>
 

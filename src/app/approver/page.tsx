@@ -20,6 +20,10 @@ export default async function ApproverDashboard() {
     redirect('/login');
   }
 
+  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
+  // FR-15 / Appendix A: reassignment is an Administrator-only action.
+  const canReassign = dbUser?.role === 'admin' || dbUser?.role === 'system_admin';
+
   const [items, hasSignature, signaturePreview, approversList] = await Promise.all([
     getApproverQueue(),
     hasEnrolledSignature(user.id),
@@ -100,6 +104,7 @@ export default async function ApproverDashboard() {
         hasSignature={hasSignature}
         signaturePreviewUrl={signaturePreview.previewUrl}
         approversList={approversList}
+        canReassign={canReassign}
         onApproveAction={handleApprove}
         onReturnAction={handleReturn}
         onReassignAction={handleReassign}
