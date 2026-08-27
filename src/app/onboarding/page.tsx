@@ -1,6 +1,7 @@
 import { updateInternshipDates } from '@lib/data/users';
 import { redirect } from 'next/navigation';
 import { createClient } from '@lib/supabase/server';
+import { Button } from '@/components/ui/button';
 
 export default async function OnboardingPage({
   searchParams,
@@ -73,12 +74,9 @@ export default async function OnboardingPage({
               className="w-full rounded border border-border-default p-2 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
             />
           </div>
-          <button
-            type="submit"
-            className="mt-2 w-full rounded bg-brand-primary py-2 text-white text-sm font-medium hover:bg-brand-primary-hover transition-colors"
-          >
+          <Button type="submit" className="mt-2 w-full" size="lg">
             Save Details
-          </button>
+          </Button>
         </form>
       </div>
     </div>

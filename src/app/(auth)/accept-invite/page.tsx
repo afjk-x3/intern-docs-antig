@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { LogoMark } from '@/components/Logo';
+import { Button } from '@/components/ui/button';
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -138,8 +140,8 @@ export default function AcceptInvitePage() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-surface-muted">
       <div className="w-full max-w-md rounded-2xl bg-surface-bg p-8 shadow-sm border border-border-default space-y-6">
         <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-primary text-white font-bold text-lg mb-1">
-            ID
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-primary text-white p-2.5 mb-1">
+            <LogoMark className="h-full w-full" />
           </div>
           <h1 className="text-xl font-bold text-text-primary">Welcome to InternDocs</h1>
           <p className="text-xs text-text-muted">
@@ -193,13 +195,9 @@ export default function AcceptInvitePage() {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || isVerifying}
-            className="w-full rounded-xl bg-brand-primary py-2.5 text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors shadow-xs"
-          >
+          <Button type="submit" disabled={loading || isVerifying} className="w-full" size="lg">
             {loading ? 'Activating Account...' : isVerifying ? 'Verifying Invite...' : 'Set Password & Enter Portal'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

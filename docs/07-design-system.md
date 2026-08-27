@@ -1,16 +1,19 @@
 # InternDocs — Design System
 
-Built on Tailwind CSS + shadcn/ui. This file defines tokens and component rules. Update section 1 the moment the Makerspace logo and brand colors arrive in Antigravity; nothing else in this file should need to change when that happens.
+Built on Tailwind CSS + shadcn/ui. This file defines tokens and component rules.
 
-## 1. Brand tokens — CONFIRMED from Makerspace logo
+## 1. Brand tokens
 
-The Makerspace logo (`docs/makerspace-brand.png`) was used to extract the primary and accent hex values below. Contrast ratios verified against white (#FFFFFF): primary #1B3251 = 10.07:1, accent #C9400A = 4.88:1, both pass WCAG AA.
+**Decision (2026-08-27):** the product identity is the InternDocs name, not the Makerspace org logo. The Makerspace mark (`public/makerspace-brand.png`) is retired from the UI — it does not appear anywhere in the app shell. Brand presence is now a code-drawn wordmark + mark (`src/components/Logo.tsx`, exports `Logo`, `LogoMark`, `Wordmark`) built from these same hex values, which were originally extracted from the Makerspace logo and are kept because they independently pass WCAG AA. Every screen that showed a logo (login, `RoleSidebar`, `intern/layout.tsx`, `accept-invite`) now renders `Logo`/`LogoMark` instead of an "ID" placeholder or the Makerspace raster.
+
+Contrast ratios verified against white (#FFFFFF): primary #1B3251 = 10.07:1, accent #C9400A = 4.88:1, both pass WCAG AA.
 
 ```css
 :root {
-  --brand-primary: #1B3251;      /* Makerspace primary */
+  --brand-primary: #1B3251;
   --brand-primary-hover: #112136;
-  --brand-accent: #C9400A;       /* Makerspace secondary */
+  --brand-accent: #C9400A;
+  --brand-muted: #EEF2F6;        /* light primary tint — active nav/tab backgrounds */
 
   --status-not-started: #94A3B8;
   --status-draft: #64748B;
@@ -23,13 +26,18 @@ The Makerspace logo (`docs/makerspace-brand.png`) was used to extract the primar
 
   --surface-bg: #FFFFFF;
   --surface-muted: #F8FAFC;
+  --surface-hover: #F1F5F9;      /* row/item hover state — do not reach for raw slate-50/100 */
+  --surface-elevated: #FFFFFF;   /* raised panels (modals, sticky table headers) over surface-muted */
   --border-default: #E2E8F0;
+  --border-strong: #CBD5E1;
   --text-primary: #0F172A;
   --text-muted: #334155;         /* 7.01:1 on white — WCAG AA pass */
 }
 ```
 
-**Status:** Brand tokens are confirmed and applied in `src/app/globals.css`. Contrast verification complete.
+**Status:** Brand tokens are confirmed and applied in `src/app/globals.css`. `--brand-muted` was referenced by `RoleSidebar`'s active-nav state before it existed as a token (a silent no-op bug); it's now defined, and the active nav item also gets a 3px `--brand-accent` left border so the accent color has real presence in the app shell, not just on the login page.
+
+Any color introduced for a status/feedback purpose (warnings, success confirmations, danger banners) should reuse the `--status-*` tokens above rather than inventing a new Tailwind shade inline — several components had drifted into ad hoc `emerald-950`/`amber-900`/`rose-800`-style one-offs; new work should not add to that list.
 
 ## 2. Typography
 
@@ -67,6 +75,8 @@ One component, `ConfirmAction`, used for every state-changing action: approve, r
 ## 8. Components sourced from shadcn/ui
 
 Use shadcn/ui primitives for: buttons, form fields, dialogs, tables, tabs, toasts, dropdown menus. Do not hand-roll a component shadcn/ui already provides. Custom components (StatusBadge, ConfirmAction, signature canvas, requirement checklist card) are the exceptions because they encode domain rules shadcn/ui has no opinion on.
+
+**Enforcement note (2026-08-27):** several surfaces (`InternChecklist`, `ApproverQueue`, `AdminDashboardMatrix`, `RoleSidebar`, auth pages) had drifted into raw `<button className="...">` elements with hand-copied Tailwind instead of `src/components/ui/button.tsx`. These have been migrated to `Button`, using `variant`/`size` to express hierarchy instead of one-off classes — e.g. in `ApproverQueue`'s row actions, `ghost` for View/Timeline/Reassign, an outline tinted with `--status-returned` for Return, and `success` (solid) for the row's actual primary action, Approve. Any new action button should start from `Button`; reach for a bespoke `<button>` only when the shared component genuinely can't express the case, and prefer overriding `className` (merged via `cn`/`tailwind-merge`) over duplicating its base styles.
 
 ## 9. Motion
 

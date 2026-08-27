@@ -1,7 +1,7 @@
 import { login } from '@lib/data/auth';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/LoginForm';
-import Image from 'next/image';
+import { Logo } from '@/components/Logo';
 
 export const metadata = {
   title: 'Sign In — InternDocs',
@@ -64,16 +64,9 @@ export default async function LoginPage({
           </svg>
         </div>
 
-        {/* Top — Makerspace logo */}
+        {/* Top — InternDocs logo */}
         <div className="relative z-10">
-          <Image
-            src="/makerspace-brand.png"
-            alt="Makerspace InnovHub"
-            width={220}
-            height={56}
-            className="brightness-0 invert opacity-90"
-            priority
-          />
+          <Logo onDark markClassName="h-12 w-12" textClassName="text-2xl" />
         </div>
 
         {/* Center — hero text */}
@@ -101,14 +94,7 @@ export default async function LoginPage({
       <div className="flex flex-1 flex-col justify-center px-6 sm:px-10 lg:px-20 py-10 bg-surface-muted">
         {/* Mobile-only brand header */}
         <div className="md:hidden mb-10">
-          <Image
-            src="/makerspace-brand.png"
-            alt="Makerspace InnovHub"
-            width={180}
-            height={46}
-            className="mb-6"
-            priority
-          />
+          <Logo markClassName="h-11 w-11" textClassName="text-2xl" className="mb-6" />
           <h1 className="text-3xl font-extrabold text-text-primary tracking-tight leading-tight">
             Welcome <span className="text-brand-accent">back.</span>
           </h1>

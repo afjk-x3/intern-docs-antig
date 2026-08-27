@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { createAdminClient } from '@lib/supabase/admin';
 import { runRetentionSweep } from '@lib/jobs/retention-sweep';
 import { RunRetentionSweepButton } from '@/components/RunRetentionSweepButton';
+import { humanizeCode } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +16,7 @@ export default async function SystemAdminRetentionPage() {
       .order('created_at', { ascending: false }),
     adminClient
       .from('audit_log')
-      .select('id, action, payload, created_at')
+      .select('id, action, target_id, payload, created_at')
       .eq('action', 'RETENTION_PURGE_EXECUTED')
       .order('created_at', { ascending: false })
       .limit(50),
@@ -60,7 +62,7 @@ export default async function SystemAdminRetentionPage() {
 
         <div className="bg-surface-bg border border-border-default rounded-2xl p-5 shadow-xs space-y-1">
           <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Purged Files (30d)</span>
-          <div className="text-2xl font-bold text-slate-700">{purgedItems.length}</div>
+          <div className="text-2xl font-bold text-text-muted">{purgedItems.length}</div>
           <p className="text-[11px] text-text-muted">Storage bytes wiped permanently</p>
         </div>
 
@@ -106,13 +108,18 @@ export default async function SystemAdminRetentionPage() {
             </thead>
             <tbody className="divide-y divide-border-default">
               {purgeLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-slate-800 text-[11px]">{log.action}</td>
-                  <td className="py-3 px-4 font-mono text-text-muted text-[11px]">
-                    {log.target_id || '—'}
+                <tr key={log.id} className="hover:bg-surface-hover transition-colors">
+                  <td className="py-3 px-4 font-semibold text-text-primary text-[11px]">{humanizeCode(log.action)}</td>
+                  <td className="py-3 px-4 font-mono text-[11px]">
+                    {log.target_id ? (
+                      <Link href={`/admin/submissions/${log.target_id}`} className="text-brand-primary hover:underline">
+                        {log.target_id}
+                      </Link>
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
                   </td>
-                  <td className="py-3 px-4 font-mono text-[10px] text-slate-500 max-w-xs truncate">
-                    {/* @ts-expect-error payload schema */}
+                  <td className="py-3 px-4 font-mono text-[10px] text-text-muted max-w-xs truncate">
                     {log.payload?.file_hash || '—'}
                   </td>
                   <td className="py-3 px-4 text-text-muted">

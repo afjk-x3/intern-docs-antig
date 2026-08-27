@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { ConfirmAction } from '@/components/ConfirmAction';
+import { Button } from '@/components/ui/button';
 
 interface SignaturePadProps {
   currentSignatureUrl?: string | null;
@@ -200,13 +201,13 @@ export function SignaturePad({
                   : 'N/A'}
               </p>
             </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-status-approved/10 text-emerald-700 border border-status-approved/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-status-approved" />
               Active
             </span>
           </div>
 
-          <div className="h-28 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex items-center justify-center p-3">
+          <div className="h-28 bg-surface-muted border border-dashed border-border-default rounded-lg flex items-center justify-center p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={currentSignatureUrl}
@@ -269,7 +270,7 @@ export function SignaturePad({
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'canvas' ? (
             <div>
-              <div className="relative border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden touch-none">
+              <div className="relative border-2 border-dashed border-border-strong rounded-xl bg-surface-muted overflow-hidden touch-none">
                 <canvas
                   ref={canvasRef}
                   onMouseDown={startDrawing}
@@ -282,7 +283,7 @@ export function SignaturePad({
                   className="w-full h-44 cursor-crosshair block"
                 />
                 {!hasDrawn && (
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-xs text-slate-400 font-medium">
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-xs text-text-muted font-medium">
                     Sign here with your mouse, stylus, or finger
                   </div>
                 )}
@@ -292,13 +293,9 @@ export function SignaturePad({
                 <span className="text-[11px] text-text-muted">
                   Make sure your signature is clear and centered.
                 </span>
-                <button
-                  type="button"
-                  onClick={clearCanvas}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1"
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={clearCanvas} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50">
                   Clear Canvas
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -325,12 +322,9 @@ export function SignaturePad({
           )}
 
           <div className="flex justify-end pt-3 border-t border-border-default">
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors flex items-center gap-2"
-            >
+            <Button type="submit">
               {currentSignatureUrl ? 'Update Signature' : 'Save Signature'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -359,10 +353,10 @@ export function SignaturePad({
       >
         {pendingPreviewUrl && (
           <div>
-            <span className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">
-              Preview -- approximate size as stamped on an approved document:
+            <span className="block text-[10px] uppercase font-bold text-text-muted mb-1.5">
+              Preview — approximate size as stamped on an approved document:
             </span>
-            <div className="h-24 flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-300 p-3">
+            <div className="h-24 flex items-center justify-center bg-surface-muted rounded-lg border border-dashed border-border-strong p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={pendingPreviewUrl}

@@ -11,6 +11,8 @@ const inviteSchema = z.object({
   role: z.enum(['intern', 'approver', 'admin', 'system_admin']),
 });
 
+const ACCEPT_INVITE_URL = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/accept-invite`;
+
 export async function inviteUser(email: string, role: string) {
   const supabase = await createClient();
   const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
@@ -42,7 +44,7 @@ export async function inviteUser(email: string, role: string) {
 
   // 1. Try standard inviteUserByEmail
   const { data: invitedUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(parsed.email, {
-    redirectTo: 'http://localhost:3000/accept-invite',
+    redirectTo: ACCEPT_INVITE_URL,
   });
 
   if (invitedUser?.user) {
@@ -53,7 +55,7 @@ export async function inviteUser(email: string, role: string) {
       type: 'invite',
       email: parsed.email,
       options: {
-        redirectTo: 'http://localhost:3000/accept-invite',
+        redirectTo: ACCEPT_INVITE_URL,
       },
     });
 
@@ -73,7 +75,7 @@ export async function inviteUser(email: string, role: string) {
           type: 'magiclink',
           email: parsed.email,
           options: {
-            redirectTo: 'http://localhost:3000/accept-invite',
+            redirectTo: ACCEPT_INVITE_URL,
           },
         });
         inviteLink = magicLinkData?.properties?.action_link || null;

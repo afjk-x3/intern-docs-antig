@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { XIcon } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord, ApprovalRecord } from '@lib/data/submissions';
 import { SubmissionTimelineModal } from './SubmissionTimelineModal';
@@ -44,6 +45,29 @@ export function InternChecklist({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [filterReq, setFilterReq] = useState<string>('ALL');
+  const [filterState, setFilterState] = useState<string>('ALL');
+
+  const STATE_OPTIONS = [
+    { value: 'ALL', label: 'All Statuses' },
+    { value: 'NOT_STARTED', label: 'Not Started' },
+    { value: 'DRAFT', label: 'Draft' },
+    { value: 'SUBMITTED', label: 'Submitted' },
+    { value: 'IN_REVIEW', label: 'In Review' },
+    { value: 'RETURNED', label: 'Returned' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'OVERDUE', label: 'Overdue' },
+  ];
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesReq = filterReq === 'ALL' || item.requirement.id === filterReq;
+      const matchesState =
+        filterState === 'ALL' ||
+        (filterState === 'OVERDUE' ? item.isOverdue : item.state === filterState);
+      return matchesReq && matchesState;
+    });
+  }, [items, filterReq, filterState]);
 
   const openUploadModal = (item: ChecklistItem) => {
     setSelectedItem(item);
@@ -139,9 +163,9 @@ export function InternChecklist({
             type="button"
             onClick={() => setDownloadError(null)}
             aria-label="Dismiss error"
-            className="shrink-0 font-bold text-rose-600 hover:text-rose-800"
+            className="shrink-0 p-0.5 rounded text-rose-600 hover:text-rose-800"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -161,9 +185,53 @@ export function InternChecklist({
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-surface-bg p-4 rounded-xl border border-border-default shadow-xs">
+        <div>
+          <label htmlFor="checklist-filter-req" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+            Requirement
+          </label>
+          <select
+            id="checklist-filter-req"
+            value={filterReq}
+            onChange={(e) => setFilterReq(e.target.value)}
+            className="text-xs p-1.5 rounded border border-border-default bg-surface-muted text-text-primary"
+          >
+            <option value="ALL">All Requirements</option>
+            {items.map((item) => (
+              <option key={item.requirement.id} value={item.requirement.id}>
+                {item.requirement.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="checklist-filter-state" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+            Status
+          </label>
+          <select
+            id="checklist-filter-state"
+            value={filterState}
+            onChange={(e) => setFilterState(e.target.value)}
+            className="text-xs p-1.5 rounded border border-border-default bg-surface-muted text-text-primary"
+          >
+            {STATE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Checklist Grid */}
       <div className="grid gap-4">
-        {items.map((item) => {
+        {filteredItems.length === 0 && (
+          <div className="bg-surface-bg rounded-xl border border-border-default p-8 text-center text-sm text-text-muted">
+            No requirements match the current filters.
+          </div>
+        )}
+        {filteredItems.map((item) => {
           const req = item.requirement;
           const activeVer = item.activeVersion;
           const latestAppr = item.latestApproval;
@@ -186,50 +254,40 @@ export function InternChecklist({
                 {/* Right Action / Details */}
                 <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
                   {item.state === 'NOT_STARTED' && (
-                    <button
-                      onClick={() => openUploadModal(item)}
-                      className="px-4 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
-                    >
+                    <Button size="sm" onClick={() => openUploadModal(item)}>
                       Upload File
-                    </button>
+                    </Button>
                   )}
 
                   {item.state === 'RETURNED' && (
-                    <button
-                      onClick={() => openResubmitModal(item)}
-                      className="px-4 py-2 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors"
-                    >
+                    <Button size="sm" onClick={() => openResubmitModal(item)}>
                       Re-upload Revision
-                    </button>
+                    </Button>
                   )}
 
                   {item.state === 'APPROVED' && sub?.id && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => handleDownload(sub.id!)}
-                      className="px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
+                      className="border-status-approved/30 bg-status-approved/10 text-emerald-800 hover:bg-status-approved/20"
                     >
-                      <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-3.5 w-3.5 text-status-approved" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Download Signed PDF
-                    </button>
+                    </Button>
                   )}
 
                   {['SUBMITTED', 'IN_REVIEW', 'RETURNED', 'APPROVED'].includes(item.state) && sub?.id && (
-                    <button
-                      onClick={() => setTimelineSubId(sub.id!)}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-text-muted hover:text-text-primary hover:bg-slate-50 transition-colors"
-                    >
+                    <Button size="sm" variant="outline" onClick={() => setTimelineSubId(sub.id!)}>
                       Timeline
-                    </button>
+                    </Button>
                   )}
                   {['SUBMITTED', 'IN_REVIEW'].includes(item.state) && sub?.id && (
-                    <button
-                      onClick={() => handleDownload(sub.id!)}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-text-muted hover:text-text-primary hover:bg-slate-50 transition-colors"
-                    >
+                    <Button size="sm" variant="outline" onClick={() => handleDownload(sub.id!)}>
                       View Submitted
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -248,7 +306,7 @@ export function InternChecklist({
                       </span>
                     )}
                     {activeVer && (
-                      <span className="font-medium text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      <span className="font-mono font-semibold text-[11px] text-text-muted">
                         Version {activeVer.version_number}
                       </span>
                     )}
@@ -278,7 +336,10 @@ export function InternChecklist({
               {item.state === 'RETURNED' && activeVer?.return_comment && (
                 <div className="mt-3 rounded-lg bg-rose-50 p-3 text-xs border border-rose-200 text-rose-900">
                   <div className="flex items-center gap-1.5 font-bold mb-1">
-                    <span>⚠️ Supervisor Return Feedback (v{activeVer.version_number}):</span>
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Supervisor Return Feedback (v{activeVer.version_number}):</span>
                   </div>
                   <p className="pl-4 italic">&ldquo;{activeVer.return_comment}&rdquo;</p>
                 </div>
@@ -299,8 +360,11 @@ export function InternChecklist({
                         on {new Date(latestAppr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
-                    <span className="text-[11px] font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-                      ✓ Sealed & Verified
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                      <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Sealed & Verified
                     </span>
                   </div>
 

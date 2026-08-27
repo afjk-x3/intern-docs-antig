@@ -15,6 +15,7 @@ export interface DashboardRequirement {
 }
 
 export interface DashboardSubmission {
+  id: string;
   intern_id: string;
   requirement_id: string;
   state: string;
@@ -63,6 +64,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const { data: submissions, error: subError } = await adminClient
     .from('submissions')
     .select(`
+      id,
       intern_id,
       requirement_id,
       state,
@@ -75,6 +77,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   const now = new Date();
   const formattedSubmissions = submissions.map(sub => ({
+    id: sub.id,
     intern_id: sub.intern_id,
     requirement_id: sub.requirement_id,
     state: sub.state,

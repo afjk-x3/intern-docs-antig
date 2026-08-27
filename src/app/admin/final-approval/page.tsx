@@ -114,7 +114,9 @@ export default async function AdminFinalApprovalPage() {
       {/* Approval Queue Table */}
       {step2Items.length === 0 ? (
         <div className="bg-surface-bg border border-border-default rounded-xl p-10 text-center">
-          <div className="text-4xl mb-3">✓</div>
+          <svg className="mx-auto h-12 w-12 text-status-approved mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           <h3 className="text-sm font-bold text-text-primary">No pending final approvals</h3>
           <p className="text-xs text-text-muted mt-1">
             All 2-way approval documents have been processed or are still at Supervisor review (Step 1).

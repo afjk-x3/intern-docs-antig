@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface LoginFormProps {
   error?: string | null;
@@ -140,20 +141,14 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
       </div>
 
       {/* Submit button */}
-      <button
+      <Button
         type="submit"
         id="login-submit"
-        className="
-          w-full rounded-xl bg-brand-primary py-3.5 text-white
-          text-sm font-bold tracking-wide
-          hover:bg-brand-primary-hover
-          focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2
-          active:scale-[0.98]
-          transition-all duration-150 shadow-lg shadow-brand-primary/20
-        "
+        size="lg"
+        className="w-full rounded-xl py-3.5 text-sm tracking-wide shadow-lg shadow-brand-primary/20 active:scale-[0.98]"
       >
         Sign in
-      </button>
+      </Button>
     </form>
   );
 }

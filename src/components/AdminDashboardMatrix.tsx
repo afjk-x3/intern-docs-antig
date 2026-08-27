@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { AdminDashboardData } from '@lib/data/dashboard';
 import { StatusBadge } from './StatusBadge';
+import { Button } from './ui/button';
 
 const NEEDS_ACTION_STATES = new Set(['IN_REVIEW', 'RETURNED']);
 
@@ -68,12 +70,28 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
     return data.requirements.filter(r => r.id === filterReq);
   }, [data.requirements, filterReq]);
 
+  // Requirement columns that actually have a submission matching the selected state (+
+  // approver filter) somewhere in the cohort. Used whenever a specific state is chosen so a
+  // column with nothing in that state doesn't show up at all.
+  const stateFilteredRequirements = useMemo(() => {
+    if (filterState === 'ALL') return dropdownFilteredRequirements;
+    return dropdownFilteredRequirements.filter(req =>
+      data.submissions.some(sub =>
+        sub.requirement_id === req.id &&
+        (filterState === 'OVERDUE' ? sub.isOverdue : sub.state === filterState) &&
+        (filterApprover === 'ALL' || sub.current_holder_email === filterApprover)
+      )
+    );
+  }, [dropdownFilteredRequirements, data.submissions, filterState, filterApprover]);
+
   // "Needs Action" (default): rows/columns are kept only if they contain at least one
   // In Review, Returned, or Overdue cell -- cells stay in their real row/column position,
-  // never flattened into a separate list. This intersects with the dropdown filters above.
+  // never flattened into a separate list. This only applies when no specific state is picked;
+  // an explicit state selection (chip or dropdown) is itself the more specific request and
+  // fully overrides this heuristic for both rows and columns.
   const { filteredInterns, requirementsToRender } = useMemo(() => {
-    if (viewMode === 'full') {
-      return { filteredInterns: dropdownFilteredInterns, requirementsToRender: dropdownFilteredRequirements };
+    if (viewMode === 'full' || filterState !== 'ALL') {
+      return { filteredInterns: dropdownFilteredInterns, requirementsToRender: stateFilteredRequirements };
     }
 
     const needsActionInternIds = new Set<string>();
@@ -89,7 +107,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
       filteredInterns: dropdownFilteredInterns.filter(i => needsActionInternIds.has(i.id)),
       requirementsToRender: dropdownFilteredRequirements.filter(r => needsActionReqIds.has(r.id)),
     };
-  }, [viewMode, dropdownFilteredInterns, dropdownFilteredRequirements, data.submissions]);
+  }, [viewMode, filterState, dropdownFilteredInterns, dropdownFilteredRequirements, stateFilteredRequirements, data.submissions]);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -190,22 +208,18 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
           </div>
         </div>
         <div className="flex items-end">
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-900 disabled:opacity-50"
-          >
+          <Button onClick={handleExport} disabled={isExporting} variant="outline">
             {isExporting ? 'Exporting...' : 'Export CSV'}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="bg-surface-bg border border-border-default rounded-xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Intern requirement completion matrix">
           <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-slate-50 border-b border-border-default text-xs text-text-muted sticky top-0 z-20 shadow-xs">
+            <thead className="bg-surface-muted border-b border-border-default text-xs text-text-muted sticky top-0 z-20 shadow-xs">
               <tr>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap min-w-[200px] border-r border-border-default sticky left-0 z-20 bg-slate-50">
+                <th className="px-4 py-3 font-semibold whitespace-nowrap min-w-[200px] border-r border-border-default sticky left-0 z-20 bg-surface-muted">
                   Intern ({filteredInterns.length})
                 </th>
                 {requirementsToRender.map(req => (
@@ -217,23 +231,39 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
             </thead>
             <tbody className="divide-y divide-border-default">
               {filteredInterns.map(intern => (
-                <tr key={intern.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 border-r border-border-default bg-white sticky left-0 z-10">
+                <tr key={intern.id} className="hover:bg-surface-hover transition-colors align-top">
+                  <td className="px-4 py-3 border-r border-border-default bg-white sticky left-0 z-10 align-top">
                     <div className="font-medium text-text-primary truncate" title={intern.email}>{intern.email}</div>
                   </td>
                   {requirementsToRender.map(req => {
                     const sub = data.submissions.find(s => s.intern_id === intern.id && s.requirement_id === req.id);
                     const state = sub ? sub.state : 'NOT_STARTED';
+                    const matchesStateFilter =
+                      filterState === 'ALL' || (filterState === 'OVERDUE' ? (sub?.isOverdue ?? false) : state === filterState);
                     return (
-                      <td key={req.id} className="px-4 py-3 text-center border-r border-border-default last:border-0">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          <StatusBadge state={state} isOverdue={sub?.isOverdue ?? false} />
-                          {sub?.current_holder_email && (
-                            <span className="text-[10px] text-text-muted max-w-full truncate block" title={sub.current_holder_email}>
-                              {sub.current_holder_email.split('@')[0]}
-                            </span>
-                          )}
-                        </div>
+                      <td key={req.id} className="px-4 py-3 text-center border-r border-border-default last:border-0 align-top">
+                        {matchesStateFilter ? (
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            {sub?.id ? (
+                              <Link
+                                href={`/admin/submissions/${sub.id}`}
+                                className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+                                title="View submission record"
+                              >
+                                <StatusBadge state={state} isOverdue={sub?.isOverdue ?? false} className="hover:opacity-80 transition-opacity" />
+                              </Link>
+                            ) : (
+                              <StatusBadge state={state} isOverdue={sub?.isOverdue ?? false} />
+                            )}
+                            {sub?.current_holder_email && (
+                              <span className="text-[10px] text-text-muted max-w-full truncate block" title={sub.current_holder_email}>
+                                Holder: {sub.current_holder_email.split('@')[0]}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-border-strong" aria-hidden="true">&mdash;</span>
+                        )}
                       </td>
                     );
                   })}

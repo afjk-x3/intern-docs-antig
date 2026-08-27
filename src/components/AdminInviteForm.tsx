@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { humanizeCode } from '@/lib/utils';
 
 export interface RoleOption {
   value: string;
@@ -68,7 +70,7 @@ export function AdminInviteForm({
   return (
     <div className="bg-surface-bg p-6 rounded-2xl shadow-xs border border-border-default space-y-4 max-w-3xl">
       <div>
-        <h2 className="text-base font-bold text-text-primary">
+        <h2 className="text-lg font-bold text-text-primary">
           {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
             ? 'Invite Cohort Intern'
             : 'Invite New User'}
@@ -88,8 +90,11 @@ export function AdminInviteForm({
 
       {successInfo && (
         <div role="status" className="rounded-xl bg-emerald-50 p-4 border border-emerald-200 space-y-2.5">
-          <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-            <span>✓ Invitation generated for {successInfo.email} ({successInfo.role})!</span>
+          <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs">
+            <svg className="h-3.5 w-3.5 shrink-0 text-status-approved" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Invitation generated for {successInfo.email} ({humanizeCode(successInfo.role)})!</span>
           </div>
 
           {successInfo.inviteLink && (
@@ -104,13 +109,9 @@ export function AdminInviteForm({
                   value={successInfo.inviteLink}
                   className="flex-1 bg-white border border-emerald-300 rounded-lg p-2 text-xs font-mono text-emerald-950 select-all outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="shrink-0 px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition-colors"
-                >
+                <Button type="button" size="sm" variant="success" onClick={handleCopyLink} className="shrink-0">
                   {copied ? 'Copied!' : 'Copy Link'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -139,7 +140,7 @@ export function AdminInviteForm({
             onChange={(e) => setRole(e.target.value)}
             className={`w-full border border-border-default rounded-xl p-2.5 text-xs text-text-primary outline-none ${
               allowedRoles.length <= 1
-                ? 'bg-slate-100 text-slate-600 cursor-not-allowed font-medium'
+                ? 'bg-surface-hover text-text-muted cursor-not-allowed font-medium'
                 : 'focus:ring-1 focus:ring-brand-primary focus:border-brand-primary'
             }`}
           >
@@ -151,13 +152,9 @@ export function AdminInviteForm({
           </select>
         </div>
         <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-brand-primary text-white py-2.5 px-4 rounded-xl text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors shadow-xs"
-          >
+          <Button type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? 'Generating Invite...' : 'Send Invite'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -2,6 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@lib/supabase/server';
+import { LogoMark, Wordmark } from '@/components/Logo';
+import { Button } from '@/components/ui/button';
 
 export default async function InternLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -32,14 +34,14 @@ export default async function InternLayout({ children }: { children: React.React
   return (
     <div className="min-h-screen bg-surface-muted flex flex-col">
       {/* Header */}
-      <header className="bg-surface-bg border-b border-border-default px-6 py-4 flex items-center justify-between shrink-0">
+      <header className="sticky top-0 z-20 bg-surface-bg border-b border-border-default px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/intern" className="flex items-center gap-3 group">
-            <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white font-bold group-hover:opacity-90 transition-opacity">
-              ID
+            <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white p-2 shrink-0 group-hover:opacity-90 transition-opacity">
+              <LogoMark className="h-full w-full" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-text-primary group-hover:text-brand-primary transition-colors">InternDocs</h1>
+              <Wordmark className="text-xl" />
               <p className="text-xs text-text-muted hidden sm:block">Makerspace Document Tracking</p>
             </div>
           </Link>
@@ -55,12 +57,9 @@ export default async function InternLayout({ children }: { children: React.React
             )}
           </div>
           <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="text-xs text-text-muted hover:text-text-primary font-medium px-3 py-1.5 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors"
-            >
+            <Button type="submit" variant="outline" size="sm">
               Sign out
-            </button>
+            </Button>
           </form>
         </div>
       </header>

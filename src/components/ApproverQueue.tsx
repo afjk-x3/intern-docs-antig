@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { XIcon } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord } from '@lib/data/submissions';
 import Link from 'next/link';
@@ -210,9 +211,9 @@ export function ApproverQueue({
             type="button"
             onClick={() => setDownloadError(null)}
             aria-label="Dismiss error"
-            className="shrink-0 font-bold text-rose-600 hover:text-rose-800"
+            className="shrink-0 p-0.5 rounded text-rose-600 hover:text-rose-800"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -263,26 +264,26 @@ export function ApproverQueue({
                   const slaDays = sub.routing_snapshot?.sla_days ?? sub.requirements?.routing_templates?.sla_days ?? 2;
                   const waitToneClass = waitTimeToneClass(sub.waitingHours, slaDays);
                   return (
-                    <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-text-primary">
+                    <tr key={sub.id} className="hover:bg-surface-hover transition-colors align-top">
+                      <td className="px-6 py-4 font-medium text-text-primary align-top">
                         {sub.users?.email || 'Unknown'}
                       </td>
-                      <td className="px-6 py-4 text-text-primary">
+                      <td className="px-6 py-4 text-text-primary align-top">
                         <div className="font-semibold">{sub.requirements?.name}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-block px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                      <td className="px-6 py-4 align-top">
+                        <span className="text-xs font-mono font-semibold text-text-muted">
                           v{activeVer?.version_number || 1}
                         </span>
                       </td>
-                      <td className={`px-6 py-4 text-xs ${waitToneClass}`}>
+                      <td className={`px-6 py-4 text-xs align-top ${waitToneClass}`}>
                         {sub.waitingHours < 24 ? (
                           <span>{sub.waitingHours} hours ago</span>
                         ) : (
                           <span>{Math.floor(sub.waitingHours / 24)} days ago</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 align-top">
                         <div className="space-y-1">
                           <StatusBadge state={sub.state} isOverdue={sub.isOverdue} />
                           {sub.totalSteps && sub.totalSteps > 1 && (
@@ -292,64 +293,56 @@ export function ApproverQueue({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          onClick={() => handleDownload(sub)}
-                          className="px-2.5 py-1.5 rounded-lg border border-border-default text-xs font-semibold text-text-primary hover:bg-slate-100 transition-colors inline-flex items-center gap-1"
-                          title="View / Download Document"
-                        >
+                      <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap align-top">
+                        <Button size="sm" variant="ghost" onClick={() => handleDownload(sub)} title="View / Download Document">
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                           View
-                        </button>
-                        <button
-                          onClick={() => setTimelineSubId(sub.id)}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
-                          title="View timeline history"
-                        >
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setTimelineSubId(sub.id)} title="View timeline history">
                           Timeline
-                        </button>
+                        </Button>
                         {canReassign && (
-                          <button
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => openReassignModal(sub)}
                             disabled={sub.canUserApprove === false && sub.stepRole === 'admin'}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             title="Reassign to another approver"
                           >
                             Reassign
-                          </button>
+                          </Button>
                         )}
-                        <button
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => openReturnModal(sub)}
                           disabled={sub.canUserApprove === false && sub.stepRole === 'admin'}
-                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          className="border-status-returned/30 bg-status-returned/10 text-rose-700 hover:bg-status-returned/20"
                         >
                           Return
-                        </button>
+                        </Button>
                         {sub.canUserApprove === false ? (
-                          <button
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="outline"
                             disabled
                             title={sub.disabledReason || 'Awaiting Admin Final Approval'}
-                            className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold cursor-not-allowed inline-flex items-center gap-1.5 opacity-90"
                           >
-                            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
                             {sub.disabledReason || 'Awaiting Admin Approval'}
-                          </button>
+                          </Button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => openApproveModal(sub)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 shadow-xs"
-                          >
+                          <Button type="button" size="sm" variant="success" onClick={() => openApproveModal(sub)} className="shadow-xs">
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {sub.totalSteps && sub.totalSteps > 1 && sub.current_step === 1 ? 'Approve Step 1' : 'Sign & Approve'}
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -386,12 +379,12 @@ export function ApproverQueue({
               </div>
 
               {/* Signature Stamp Preview */}
-              <div className="border border-dashed border-slate-300 rounded-xl p-3.5 bg-slate-50">
-                <span className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
+              <div className="border border-dashed border-border-strong rounded-xl p-3.5 bg-surface-muted">
+                <span className="block text-[10px] uppercase font-bold text-text-muted mb-1">
                   Your Signature Stamp to be Applied:
                 </span>
                 {hasSignature && signaturePreviewUrl ? (
-                  <div className="h-20 flex items-center justify-center bg-white rounded-lg border border-slate-200 p-2">
+                  <div className="h-20 flex items-center justify-center bg-white rounded-lg border border-border-default p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={signaturePreviewUrl}
@@ -400,8 +393,11 @@ export function ApproverQueue({
                     />
                   </div>
                 ) : (
-                  <div className="text-center py-3 text-xs text-amber-700 bg-amber-50 rounded-lg p-2">
-                    <span>⚠️ No signature enrolled. </span>
+                  <div className="flex items-center justify-center gap-1.5 text-center py-3 text-xs text-amber-700 bg-amber-50 rounded-lg p-2">
+                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>No signature enrolled.</span>
                     <Link href="/approver/signature" className="font-bold underline text-amber-900">
                       Enroll signature first
                     </Link>

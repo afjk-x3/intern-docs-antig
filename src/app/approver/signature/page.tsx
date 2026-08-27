@@ -30,7 +30,7 @@ export default async function ApproverSignaturePage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-xl font-bold text-text-primary">Signature Management</h1>
+              <h1 className="text-2xl font-bold text-text-primary">Signature Management</h1>
               <p className="text-xs text-text-muted">Enroll or update your digital signature stamp</p>
             </div>
           </div>

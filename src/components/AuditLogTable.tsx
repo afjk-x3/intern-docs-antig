@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { humanizeCode } from '@/lib/utils';
+import { Button } from './ui/button';
 
 export interface AuditLogEntry {
   id: string;
@@ -121,7 +123,7 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
           >
             <option value="all">All Actions</option>
             {uniqueActions.map(action => (
-              <option key={action} value={action}>{action}</option>
+              <option key={action} value={action}>{humanizeCode(action)}</option>
             ))}
           </select>
         </div>
@@ -138,7 +140,7 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Audit log entries">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-border-default">
+              <tr className="bg-surface-muted border-b border-border-default">
                 <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider w-40">Timestamp</th>
                 <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider">Actor</th>
                 <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider">Action</th>
@@ -155,14 +157,14 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
                 </tr>
               ) : (
                 filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-xs text-text-primary whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-surface-hover transition-colors align-top">
+                    <td className="px-4 py-3 text-xs text-text-primary whitespace-nowrap align-top">
                       {new Intl.DateTimeFormat(undefined, {
                         year: 'numeric', month: 'short', day: 'numeric',
                         hour: '2-digit', minute: '2-digit', second: '2-digit'
                       }).format(new Date(log.created_at))}
                     </td>
-                    <td className="px-4 py-3 text-xs text-text-primary">
+                    <td className="px-4 py-3 text-xs text-text-primary align-top">
                       {log.users ? (
                         <div className="flex flex-col">
                           <span className="font-semibold">{log.users.email}</span>
@@ -172,18 +174,21 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
                         <span className="text-text-muted font-mono">{log.actor_id || 'System'}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
-                        {log.action}
+                    <td className="px-4 py-3 text-xs align-top">
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200"
+                        title={log.action}
+                      >
+                        {humanizeCode(log.action)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-text-primary">
+                    <td className="px-4 py-3 text-xs text-text-primary align-top">
                       <div className="flex flex-col">
-                        <span className="font-medium">{log.target_type}</span>
+                        <span className="font-medium">{humanizeCode(log.target_type)}</span>
                         {log.target_id && <span className="text-[10px] text-text-muted font-mono truncate max-w-[200px]" title={log.target_id}>{log.target_id}</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-text-muted font-mono">
+                    <td className="px-4 py-3 text-xs text-text-muted font-mono align-top">
                       {log.source_ip || '—'}
                     </td>
                   </tr>
@@ -195,14 +200,10 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
         
         {/* Pagination Footer */}
         {hasMore && actionFilter === 'all' && (
-          <div className="px-4 py-3 border-t border-border-default bg-slate-50 flex justify-center">
-            <button
-              onClick={handleLoadMore}
-              disabled={loading}
-              className="text-xs font-semibold px-4 py-2 bg-white border border-border-default text-text-primary rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-xs"
-            >
+          <div className="px-4 py-3 border-t border-border-default bg-surface-muted flex justify-center">
+            <Button onClick={handleLoadMore} disabled={loading} variant="outline" size="sm">
               {loading ? 'Loading...' : 'Load More'}
-            </button>
+            </Button>
           </div>
         )}
       </div>

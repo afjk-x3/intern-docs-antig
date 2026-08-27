@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import type { CreateRoutingTemplateInput } from './AdminRequirementManager';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface RoutingTemplate {
   id: string;
@@ -26,14 +28,6 @@ export function AdminRoutingTemplateManager({
   const [stepCount, setStepCount] = useState<1 | 2>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowModal(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,12 +70,7 @@ export function AdminRoutingTemplateManager({
             Define sequential 1-step or 2-step approval chains and SLA turnaround targets.
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-3.5 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors shadow-xs"
-        >
-          + New Routing Template
-        </button>
+        <Button onClick={() => setShowModal(true)}>+ New Routing Template</Button>
       </div>
 
       {/* Grid of Routing Templates */}
@@ -94,8 +83,8 @@ export function AdminRoutingTemplateManager({
             <div>
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-bold text-sm text-text-primary">{tpl.name}</h3>
-                <span className="text-[11px] font-semibold text-brand-primary bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
-                  {tpl.sla_days ? `SLA: ${tpl.sla_days}d` : 'No SLA'}
+                <span className="text-[11px] font-semibold text-brand-primary bg-brand-muted px-2.5 py-0.5 rounded-full border border-border-default">
+                  {tpl.sla_days ? `${tpl.sla_days}-day SLA` : 'No SLA target'}
                 </span>
               </div>
               <p className="text-xs text-text-muted mt-1">
@@ -138,31 +127,19 @@ export function AdminRoutingTemplateManager({
       </div>
 
       {/* Create Template Modal */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center pb-3 border-b border-border-default">
-              <h3 className="text-base font-bold text-text-primary">Create Routing Template</h3>
-              <button
-                onClick={() => setShowModal(false)}
-                aria-label="Close dialog"
-                className="text-text-muted hover:text-text-primary font-bold p-1"
-              >
-                ✕
-              </button>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Routing Template</DialogTitle>
+          </DialogHeader>
+
+          {errorMsg && (
+            <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+              {errorMsg}
             </div>
+          )}
 
-            {errorMsg && (
-              <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-text-primary mb-1">Template Name</label>
                 <input
@@ -206,39 +183,30 @@ export function AdminRoutingTemplateManager({
               <div className="bg-surface-muted p-3.5 rounded-xl border border-border-default space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Workflow Preview</span>
                 <div className="space-y-1 text-xs">
-                  <div className="flex items-center justify-between text-slate-700">
+                  <div className="flex items-center justify-between text-text-primary">
                     <span>Step 1: Supervisor Review</span>
-                    <span className="text-[10px] font-mono text-slate-500">role: approver</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Approver</span>
                   </div>
                   {stepCount === 2 && (
-                    <div className="flex items-center justify-between text-slate-700">
+                    <div className="flex items-center justify-between text-text-primary">
                       <span>Step 2: Admin Final Sign-Off</span>
-                      <span className="text-[10px] font-mono text-slate-500">role: admin</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Admin</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:bg-slate-100"
-                >
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
-                >
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Template'}
-                </button>
-              </div>
+                </Button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -37,7 +37,7 @@ export function RunRetentionSweepButton({ onRunSweepAction }: RunRetentionSweepB
           setOpen(true);
         }}
       >
-        ⚡ Run Retention Sweep Now
+        Run Retention Sweep Now
       </Button>
 
       <ConfirmAction

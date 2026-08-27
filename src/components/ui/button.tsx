@@ -12,8 +12,8 @@ const buttonVariants = cva(
         default: 'bg-brand-primary text-white hover:bg-brand-primary-hover shadow-xs',
         destructive: 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs',
         success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs',
-        outline: 'border border-border-default bg-surface-bg text-text-primary hover:bg-slate-100',
-        ghost: 'text-text-muted hover:bg-slate-100',
+        outline: 'border border-border-default bg-surface-bg text-text-primary hover:bg-surface-hover',
+        ghost: 'text-text-muted hover:bg-surface-hover hover:text-text-primary',
         link: 'text-brand-primary underline-offset-4 hover:underline',
       },
       size: {

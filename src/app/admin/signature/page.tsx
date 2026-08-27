@@ -28,7 +28,7 @@ export default async function AdminSignaturePage() {
     <div className="p-6 md:p-10">
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">Signature Management</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Signature Management</h1>
           <p className="text-xs text-text-muted mt-0.5">
             Enroll or update your digital signature stamp for final document approvals.
           </p>

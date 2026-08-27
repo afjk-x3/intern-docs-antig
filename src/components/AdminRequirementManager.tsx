@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 export interface CreateRequirementInput {
   name: string;
@@ -68,16 +70,6 @@ export function AdminRequirementManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowReqModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const handleTypeToggle = (type: string) => {
     if (acceptedTypes.includes(type)) {
       if (acceptedTypes.length > 1) {
@@ -121,12 +113,7 @@ export function AdminRequirementManager({
           <h2 className="text-lg font-bold text-text-primary">Requirement Definitions</h2>
           <p className="text-xs text-text-muted">Configure document requirements and linked approval workflows.</p>
         </div>
-        <button
-          onClick={() => setShowReqModal(true)}
-          className="px-3.5 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover transition-colors shadow-xs"
-        >
-          + New Requirement
-        </button>
+        <Button onClick={() => setShowReqModal(true)}>+ New Requirement</Button>
       </div>
 
       {/* Requirements List */}
@@ -143,8 +130,8 @@ export function AdminRequirementManager({
                   Version {req.version_number}
                 </span>
               </div>
-              <span className="text-xs font-semibold text-brand-primary bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
-                {req.due_date_type === 'relative' ? `${req.due_date_value} days relative` : `Fixed: ${req.due_date_value}`}
+              <span className="text-xs font-semibold text-brand-primary bg-brand-muted px-2.5 py-0.5 rounded-full border border-border-default">
+                {req.due_date_type === 'relative' ? `Due ${req.due_date_value} days after start` : `Due ${req.due_date_value}`}
               </span>
             </div>
 
@@ -171,31 +158,19 @@ export function AdminRequirementManager({
       </div>
 
       {/* Create Requirement Modal */}
-      {showReqModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-lg rounded-2xl bg-surface-bg p-6 shadow-xl border border-border-default space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center pb-3 border-b border-border-default">
-              <h3 className="text-base font-bold text-text-primary">Create Requirement Definition</h3>
-              <button
-                onClick={() => setShowReqModal(false)}
-                aria-label="Close dialog"
-                className="text-text-muted hover:text-text-primary font-bold p-1"
-              >
-                ✕
-              </button>
+      <Dialog open={showReqModal} onOpenChange={setShowReqModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Requirement Definition</DialogTitle>
+          </DialogHeader>
+
+          {errorMsg && (
+            <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
+              {errorMsg}
             </div>
+          )}
 
-            {errorMsg && (
-              <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleReqSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleReqSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-text-primary mb-1">Requirement Name</label>
                 <input
@@ -310,26 +285,17 @@ export function AdminRequirementManager({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
-                <button
-                  type="button"
-                  onClick={() => setShowReqModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:bg-slate-100"
-                >
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setShowReqModal(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50"
-                >
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Requirement'}
-                </button>
-              </div>
+                </Button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

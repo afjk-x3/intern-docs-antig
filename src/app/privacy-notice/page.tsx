@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@lib/supabase/server';
 import { acknowledgePrivacyNotice } from '@lib/data/privacy';
+import { Button } from '@/components/ui/button';
 
 // FR-25 (G5): shown and acknowledged at first login, acknowledgement recorded.
 // Draft notice content -- the Data Protection Officer's name (required for a
@@ -136,12 +137,9 @@ export default async function PrivacyNoticePage({
               />
               <span>I have read and understood this privacy notice.</span>
             </label>
-            <button
-              type="submit"
-              className="w-full rounded bg-brand-primary py-2 text-white text-sm font-medium hover:bg-brand-primary-hover transition-colors"
-            >
+            <Button type="submit" className="w-full" size="lg">
               Continue
-            </button>
+            </Button>
           </form>
         </div>
       </div>

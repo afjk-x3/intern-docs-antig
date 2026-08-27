@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import type { SubmissionWithRelations } from '../../lib/data/submissions';
 import { fetchSubmissionTimelineAction, fetchSubmissionDetailsAction } from '../app/actions/submissions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { StatusBadge } from './StatusBadge';
+import { humanizeCode } from '@/lib/utils';
 
 interface TimelineEvent {
   id: string;
@@ -55,10 +57,10 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
       RESUBMIT_DOCUMENT: 'Document Re-submitted',
       APPROVE_STEP: 'Step Approved',
       APPROVE_FINAL: 'Final Approval Granted',
-      RETURN_DOCUMENT: 'Document Returned for Revision',
+      RETURN_SUBMISSION: 'Document Returned for Revision',
       REASSIGN_APPROVER: 'Approver Reassigned',
     };
-    return lookup[action] || action;
+    return lookup[action] || humanizeCode(action);
   };
 
   return (
@@ -88,8 +90,8 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
               <div className="bg-surface-muted p-4 rounded-xl border border-border-default text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="block text-xs font-semibold text-text-muted">Current State</span>
-                    <span className="font-bold text-text-primary">{submission?.state}</span>
+                    <span className="block text-xs font-semibold text-text-muted mb-1">Current State</span>
+                    {submission?.state && <StatusBadge state={submission.state} />}
                   </div>
                   {submission?.state === 'IN_REVIEW' && (
                     <>
@@ -116,7 +118,7 @@ export function SubmissionTimelineModal({ submissionId, onClose }: SubmissionTim
                       </span>
                       {ev.users && (
                         <span className="text-[11px] text-slate-500 mt-0.5">
-                          by {ev.users.email} ({ev.users.role})
+                          by {ev.users.email} ({humanizeCode(ev.users.role)})
                         </span>
                       )}
                     </div>

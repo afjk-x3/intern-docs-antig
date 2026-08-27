@@ -2,19 +2,21 @@ import { createClient } from '@lib/supabase/server';
 import { createAdminClient } from '@lib/supabase/admin';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { StatusBadge } from '@/components/StatusBadge';
+import { humanizeCode } from '@/lib/utils';
 
-export default async function AdminSubmissionViewPage({ params }: { params: { id: string } }) {
+export default async function AdminSubmissionViewPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) redirect('/login');
 
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
-    redirect('/unauthorized');
+    redirect('/login');
   }
 
   const adminClient = createAdminClient();
-  const { id } = params;
+  const { id } = await params;
 
   // Fetch submission details with versions and approvals
   const { data: submission, error } = await adminClient
@@ -66,34 +68,28 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
               </p>
             </div>
             <div>
-              <span className={`px-3 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${
-                submission.state === 'PURGED' ? 'bg-slate-100 text-slate-800 border border-slate-300' :
-                submission.state === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                'bg-amber-100 text-amber-800'
-              }`}>
-                {submission.state}
-              </span>
+              <StatusBadge state={submission.state} />
             </div>
           </div>
 
           {activeVersion?.deleted_at ? (
-            <div className="mb-6 bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700">
-              <div className="flex items-center gap-2 font-bold mb-2 text-slate-900">
+            <div className="mb-6 bg-surface-muted border border-border-default rounded-lg p-4 text-sm text-text-muted">
+              <div className="flex items-center gap-2 font-bold mb-2 text-text-primary">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 Document Deleted (Retention Policy)
               </div>
               <p>The file bytes for this submission were permanently deleted on <strong>{new Date(activeVersion.deleted_at).toLocaleString()}</strong> in accordance with data retention policies.</p>
-              <p className="mt-2 text-xs font-medium text-slate-700 bg-white px-2.5 py-1 border border-slate-200 rounded inline-block">
+              <p className="mt-2 text-xs font-medium text-text-primary bg-white px-2.5 py-1 border border-border-default rounded inline-block">
                 Document Record: Version {activeVersion.version_number}
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-text-muted">
                 This record serves as audit proof that the approval took place prior to data deletion.
               </p>
             </div>
           ) : (
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+            <div className="mb-6 bg-status-submitted/10 border border-status-submitted/30 rounded-lg p-4 text-sm text-blue-800">
               File bytes are still securely stored. Retention purge has not yet occurred.
             </div>
           )}
@@ -109,12 +105,15 @@ export default async function AdminSubmissionViewPage({ params }: { params: { id
                   <div key={appr.id} className="bg-surface-muted border border-border-default rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-bold text-text-primary">Step {appr.step} Approval</p>
-                      <p className="text-xs text-text-muted">by {appr.users?.email} ({appr.users?.role})</p>
+                      <p className="text-xs text-text-muted">by {appr.users?.email} ({humanizeCode(appr.users?.role || '')})</p>
                       <p className="text-xs text-text-muted mt-1">{new Date(appr.created_at).toLocaleString()}</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded block mb-1">
-                        ✓ Verified Signature
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-status-approved/10 border border-status-approved/30 px-2.5 py-1 rounded mb-1">
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Verified Signature
                       </span>
                     </div>
                   </div>

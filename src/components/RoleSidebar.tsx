@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LogoMark, Wordmark } from './Logo';
+import { Button } from './ui/button';
 
 interface NavItem {
   label: string;
@@ -25,8 +27,8 @@ export function RoleSidebar({ roleTitle, userName, navItems, children }: RoleSid
       {/* Mobile Header */}
       <div className="md:hidden bg-surface-bg border-b border-border-default p-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-bold text-sm">
-            ID
+          <div className="h-8 w-8 rounded-lg bg-brand-primary flex items-center justify-center text-white p-1.5 shrink-0">
+            <LogoMark className="h-full w-full" />
           </div>
           <span className="font-bold text-text-primary">{roleTitle}</span>
         </div>
@@ -55,35 +57,44 @@ export function RoleSidebar({ roleTitle, userName, navItems, children }: RoleSid
         `}
       >
         <div className="p-6 hidden md:flex items-center gap-3 shrink-0">
-          <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white font-bold">
-            ID
+          <div className="h-10 w-10 rounded-xl bg-brand-primary flex items-center justify-center text-white p-2 shrink-0">
+            <LogoMark className="h-full w-full" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text-primary">InternDocs</h1>
+            <Wordmark className="text-xl" />
             <p className="text-xs text-text-muted">{roleTitle}</p>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
-            return (
+          {(() => {
+            // Pick the single most-specific matching href so a parent route (e.g. /system-admin)
+            // doesn't stay highlighted alongside a child route (e.g. /system-admin/audit-log).
+            const activeHref = navItems
+              .map((i) => i.href)
+              .filter((href) => pathname === href || pathname?.startsWith(`${href}/`))
+              .sort((a, b) => b.length - a.length)[0];
+
+            return navItems.map((item) => {
+              const isActive = item.href === activeHref;
+              return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`
-                  block px-4 py-2.5 rounded-lg text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-primary
+                  block pl-3.5 pr-4 py-2.5 rounded-lg text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-primary border-l-[3px]
                   ${isActive
-                    ? 'bg-brand-muted text-brand-primary font-bold'
-                    : 'text-text-primary hover:bg-slate-50 hover:text-brand-primary font-medium'
+                    ? 'bg-brand-muted text-brand-primary font-bold border-brand-accent'
+                    : 'text-text-primary hover:bg-surface-hover hover:text-brand-primary font-medium border-transparent'
                   }
                 `}
               >
                 {item.label}
               </Link>
-            );
-          })}
+              );
+            });
+          })()}
         </nav>
 
         <div className="p-6 border-t border-border-default shrink-0">
@@ -91,12 +102,9 @@ export function RoleSidebar({ roleTitle, userName, navItems, children }: RoleSid
             {userName}
           </p>
           <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="w-full text-left text-xs text-text-muted hover:text-text-primary font-medium px-3 py-2 rounded-lg border border-border-default bg-surface-bg hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
+            <Button type="submit" variant="outline" size="sm" className="w-full justify-start">
               Sign out
-            </button>
+            </Button>
           </form>
         </div>
       </aside>

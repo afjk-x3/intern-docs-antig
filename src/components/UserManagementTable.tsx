@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { XIcon } from 'lucide-react';
 import { ConfirmAction } from '@/components/ConfirmAction';
+import { humanizeCode } from '@/lib/utils';
 
 export interface ManagedUser {
   id: string;
@@ -43,10 +45,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
     };
   }, [users]);
 
-  const handleRoleFormSubmit = (e: React.FormEvent<HTMLFormElement>, user: ManagedUser) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const nextRole = formData.get('role') as string;
+  const handleRoleSelect = (user: ManagedUser, nextRole: string) => {
     if (nextRole === user.role) return;
     setConfirmError(null);
     setPendingChange({ user, nextRole });
@@ -77,7 +76,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
       {/* Top Header & Search / Filter Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="font-bold text-sm text-text-primary flex items-center gap-2">
+          <h2 className="font-bold text-lg text-text-primary flex items-center gap-2">
             <span>Registered Users</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
               {filteredUsers.length} of {users.length}
@@ -87,8 +86,11 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
         </div>
 
         {statusMessage && (
-          <div className="text-xs font-medium text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 animate-in fade-in">
-            ✓ {statusMessage}
+          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-status-approved/10 px-3 py-1.5 rounded-xl border border-status-approved/30 animate-in fade-in">
+            <svg className="h-3.5 w-3.5 text-status-approved shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {statusMessage}
           </div>
         )}
       </div>
@@ -103,14 +105,17 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
             placeholder="Search users by email address..."
             className="w-full pl-9 pr-8 py-2 rounded-xl border border-border-default text-xs text-text-primary placeholder:text-text-muted bg-white focus:border-brand-primary outline-none"
           />
-          <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+          <svg className="absolute left-3 top-2.5 h-3.5 w-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+          </svg>
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+              aria-label="Clear search"
+              className="absolute right-2.5 top-2 p-0.5 rounded text-text-muted hover:text-text-primary"
             >
-              ✕
+              <XIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -131,7 +136,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
             className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
               roleFilter === pill.key
                 ? 'bg-brand-primary text-white'
-                : 'bg-surface-muted text-text-muted hover:bg-slate-200/60'
+                : 'bg-surface-muted text-text-muted hover:bg-surface-hover'
             }`}
           >
             {pill.label} ({pill.count})
@@ -152,7 +157,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
           </thead>
           <tbody className="divide-y divide-border-default">
             {filteredUsers.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={u.id} className="hover:bg-surface-hover transition-colors">
                 <td className="py-3.5 px-4 font-medium text-text-primary">
                   {u.email}
                 </td>
@@ -168,7 +173,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
                         : 'bg-slate-100 text-slate-700'
                     }`}
                   >
-                    {u.role}
+                    {humanizeCode(u.role)}
                   </span>
                 </td>
                 <td className="py-3.5 px-4 text-text-muted font-mono text-[11px]">
@@ -177,32 +182,21 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
                     : '—'}
                 </td>
                 <td className="py-3.5 px-4">
-                  <form
-                    onSubmit={(e) => handleRoleFormSubmit(e, u)}
-                    className="flex items-center gap-2"
+                  <label htmlFor={`role-${u.id}`} className="sr-only">
+                    Change role for {u.email}
+                  </label>
+                  <select
+                    id={`role-${u.id}`}
+                    value={u.role}
+                    onChange={(e) => handleRoleSelect(u, e.target.value)}
+                    disabled={isUpdating === u.id}
+                    className="rounded-lg border border-border-default p-1.5 text-xs bg-white text-text-primary focus:border-brand-primary outline-none disabled:opacity-50"
                   >
-                    <label htmlFor={`role-${u.id}`} className="sr-only">
-                      Change role for {u.email}
-                    </label>
-                    <select
-                      id={`role-${u.id}`}
-                      name="role"
-                      defaultValue={u.role}
-                      className="rounded-lg border border-border-default p-1.5 text-xs bg-white text-text-primary focus:border-brand-primary outline-none"
-                    >
-                      <option value="intern">Intern</option>
-                      <option value="approver">Approver</option>
-                      <option value="admin">Admin</option>
-                      <option value="system_admin">System Admin</option>
-                    </select>
-                    <button
-                      type="submit"
-                      disabled={isUpdating === u.id}
-                      className="px-3 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primary-hover disabled:opacity-50 transition-colors shadow-xs"
-                    >
-                      {isUpdating === u.id ? 'Saving...' : 'Save'}
-                    </button>
-                  </form>
+                    <option value="intern">Intern</option>
+                    <option value="approver">Approver</option>
+                    <option value="admin">Admin</option>
+                    <option value="system_admin">System Admin</option>
+                  </select>
                 </td>
               </tr>
             ))}
@@ -239,9 +233,9 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
               <strong className="text-text-primary">{pendingChange.user.email}</strong>
             </div>
             <div className="text-text-muted">
-              <strong className="text-rose-700">{pendingChange.user.role}</strong>
+              <strong className="text-rose-700">{humanizeCode(pendingChange.user.role)}</strong>
               {' → '}
-              <strong className="text-emerald-700">{pendingChange.nextRole}</strong>
+              <strong className="text-emerald-700">{humanizeCode(pendingChange.nextRole)}</strong>
             </div>
           </div>
         </ConfirmAction>

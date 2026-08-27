@@ -1,5 +1,6 @@
 import { createAdminClient } from '@lib/supabase/admin';
 import Link from 'next/link';
+import { humanizeCode } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,11 +67,14 @@ export default async function SystemAdminOverviewPage() {
       {/* RA 10173 Security & Compliance Status */}
       <div className="bg-surface-bg border border-border-default rounded-2xl p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-            <span>🛡️</span> Data Privacy (RA 10173) &amp; Security Posture
+          <h2 className="text-base font-bold text-text-primary">
+            Data Privacy (RA 10173) &amp; Security Posture
           </h2>
-          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-            ✓ Compliant &amp; Active
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-status-approved/10 px-2.5 py-1 rounded-full border border-status-approved/30">
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Compliant &amp; Active
           </span>
         </div>
 
@@ -106,7 +110,7 @@ export default async function SystemAdminOverviewPage() {
           <div className="space-y-3">
             <Link
               href="/system-admin/users"
-              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-surface-hover transition-colors"
             >
               <div>
                 <span className="font-semibold text-xs text-text-primary block">User &amp; Role Governance</span>
@@ -117,7 +121,7 @@ export default async function SystemAdminOverviewPage() {
 
             <Link
               href="/system-admin/audit-log"
-              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-surface-hover transition-colors"
             >
               <div>
                 <span className="font-semibold text-xs text-text-primary block">Security Audit Log</span>
@@ -128,7 +132,7 @@ export default async function SystemAdminOverviewPage() {
 
             <Link
               href="/system-admin/retention"
-              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between p-3.5 rounded-xl border border-border-default hover:bg-surface-hover transition-colors"
             >
               <div>
                 <span className="font-semibold text-xs text-text-primary block">Retention &amp; Deletion Engine</span>
@@ -151,7 +155,7 @@ export default async function SystemAdminOverviewPage() {
           <div className="space-y-2.5">
             {recentAudit.map((log) => (
               <div key={log.id} className="flex items-center justify-between p-2.5 rounded-xl bg-surface-muted text-xs">
-                <span className="font-mono font-semibold text-[11px] text-text-primary">{log.action}</span>
+                <span className="font-semibold text-[11px] text-text-primary">{humanizeCode(log.action)}</span>
                 <span className="text-[11px] text-text-muted">
                   {new Date(log.created_at).toLocaleString()}
                 </span>
