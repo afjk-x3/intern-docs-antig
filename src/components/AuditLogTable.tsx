@@ -95,8 +95,9 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-center gap-4 bg-surface-bg p-4 rounded-xl border border-border-default shadow-xs">
         <div className="w-full sm:w-auto">
-          <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1">Actor</label>
+          <label htmlFor="audit-actor-filter" className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1">Actor</label>
           <select
+            id="audit-actor-filter"
             value={actorFilter}
             onChange={handleActorFilterChange}
             disabled={loading}
@@ -110,8 +111,9 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
         </div>
 
         <div className="w-full sm:w-auto">
-          <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1">Action</label>
+          <label htmlFor="audit-action-filter" className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1">Action</label>
           <select
+            id="audit-action-filter"
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
             disabled={loading}
@@ -133,7 +135,7 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
 
       {/* Table */}
       <div className="bg-surface-bg border border-border-default rounded-xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Audit log entries">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-slate-50 border-b border-border-default">

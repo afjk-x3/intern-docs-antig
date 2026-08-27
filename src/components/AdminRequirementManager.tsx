@@ -139,7 +139,7 @@ export function AdminRequirementManager({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-bold text-sm text-text-primary">{req.name}</h3>
-                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
                   Version {req.version_number}
                 </span>
               </div>

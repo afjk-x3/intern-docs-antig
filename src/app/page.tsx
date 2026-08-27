@@ -22,12 +22,16 @@ export default async function RootPage() {
     redirect('/login');
   }
 
-  // Fetch user role and internship dates
+  // Fetch user role, internship dates, and privacy notice acknowledgement
   const { data: userData } = await supabase
     .from('users')
-    .select('role, internship_start, internship_end')
+    .select('role, internship_start, internship_end, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
+
+  if (!userData?.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
+  }
 
   const role = userData?.role;
 

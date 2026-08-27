@@ -120,7 +120,7 @@ export function AdminRoutingTemplateManager({
                       </span>
                       <span className="font-semibold text-text-primary text-xs">{s.name || `Step ${idx + 1}`}</span>
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-200/60 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] uppercase font-bold text-slate-700 bg-slate-200/60 px-1.5 py-0.5 rounded">
                       {s.role || 'approver'}
                     </span>
                   </div>

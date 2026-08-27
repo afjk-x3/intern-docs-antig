@@ -245,7 +245,7 @@ export function ApproverQueue({
         </div>
       ) : (
         <div className="bg-surface-bg rounded-xl border border-border-default shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Submission review queue">
             <table className="w-full text-left text-sm">
               <thead className="bg-surface-muted border-b border-border-default text-xs uppercase font-semibold text-text-muted">
                 <tr>

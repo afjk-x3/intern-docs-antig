@@ -13,7 +13,7 @@ export default async function SystemAdminLayout({ children }: { children: React.
 
   const { data: dbUser } = await supabase
     .from('users')
-    .select('email, role')
+    .select('email, role, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
 
@@ -23,6 +23,10 @@ export default async function SystemAdminLayout({ children }: { children: React.
       redirect('/admin/dashboard');
     }
     redirect('/login');
+  }
+
+  if (!dbUser.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
   }
 
   const navItems = [

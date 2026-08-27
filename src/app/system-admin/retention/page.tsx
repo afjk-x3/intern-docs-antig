@@ -94,7 +94,7 @@ export default async function SystemAdminRetentionPage() {
       <div className="bg-surface-bg border border-border-default rounded-2xl p-6 shadow-xs space-y-4">
         <h2 className="font-bold text-sm text-text-primary">Recent Retention Purge Logs ({purgeLogs.length})</h2>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Recent retention purge logs">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-border-default text-text-muted bg-surface-muted">

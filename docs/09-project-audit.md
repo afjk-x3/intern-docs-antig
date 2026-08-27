@@ -401,3 +401,107 @@ Installed shadcn/ui (`Dialog`, `Button`, and a new shared `ConfirmAction` compon
 
 ### Phase 5 starting line
 Of the six `01-tasks.md` Phase 5 items: "Signed URLs for every download" is now genuinely true (gap #5 above closed the last hole in it) — recommend checking that box. The other five (privacy notice, full FR-26 suite green in CI, accessibility scan + keyboard pass, backup restore rehearsal, the 3–5 DTR pilot) are still open and are the next work.
+
+## Audit — 2026-08-27 (Phase 5, gap #13) — Real FR-26 suite, and a critical finding it caught
+
+### Environment change from the previous pass
+The 2026-08-27 baseline above recorded no local Supabase instance and no way to run the FR-26 suite against real Postgres. That has changed: Docker and the Supabase CLI are now available in this environment, and a local `intern-docs-antig` stack was already running. Its applied migration history did **not** match the migration files on disk (`supabase_migrations.schema_migrations` had version `20240101000011` recorded under the name `privacy_acknowledgements`, not `fix_submissions_storage_and_delete_policy` — almost certainly a stale container from before the migration-11 rename earlier this week). Ran `npx supabase db reset` to rebuild the local DB from exactly the 12 migration files currently in the repo before trusting anything about it. Any future session inheriting a running local stack should re-verify `supabase migration list` against `ls supabase/migrations/` before relying on it — a stale local DB will silently misrepresent the real RLS surface, which is exactly what happened here (see finding below).
+
+### RLS coverage
+- [x] Spot-checked every policy against a real signed-in client per role, not assumed from the SQL text
+  **CRITICAL, found and fixed this pass**: `"Users can update own row" ON public.users FOR UPDATE USING (id = auth.uid())` (migration 0) has no `WITH CHECK` clause. Per Postgres RLS semantics, an UPDATE policy without an explicit `WITH CHECK` reuses its `USING` expression for the post-update check too — and that expression only ever constrained `id`, never `role`. Verified empirically against the freshly-reset local instance: signed in as a real `intern`-role user and ran `supabase.from('users').update({ role: 'system_admin' }).eq('id', <own id>)` through the ordinary anon-key client — it succeeded. Any authenticated user could grant themselves `system_admin` with one direct table call, bypassing `updateUserRole()`'s admin-only check entirely (05-security.md §2 / R5: "authorization implemented only in the UI"). Confirmed two legitimate self-update paths were not collateral damage before shipping the fix: `enrollSignature()` and `updateInternshipDates()` both write to their own `users` row via the same policy for non-role columns and needed to keep working.
+  **Fix**: `20240101000012_prevent_self_role_escalation.sql` adds a `BEFORE UPDATE` trigger (`prevent_self_role_change`) that raises unless `NEW.role = OLD.role` or the acting session's own role (via `get_user_role()`) is `admin`/`system_admin`. Verified all four cases against the live DB: (1) intern self-escalation now raises `Role changes require administrator privileges` and the row is unchanged; (2) intern's own non-role self-update (signature enrollment shape) still succeeds; (3) `updateUserRole()`'s actual write path (service-role client, no `sub` claim, so the trigger doesn't fire for it) still succeeds; (4) a `system_admin` changing another user's role through their own signed-in session still succeeds. Also confirmed the regression test below actually catches this class of bug: temporarily dropped the trigger at the DB level (not the migration file) and reran the suite — it failed at exactly the expected assertion, then passed again once the trigger was restored via `db reset`.
+
+### FR-26 adversarial suite — gap #13 closed
+Replaced `__tests__/auth/rls-tables.test.ts` and `__tests__/auth/rls-users.test.ts` (deleted) with `__tests__/auth/rls-integration.test.ts` — real Postgres, no mocks. Every one of the 7 scenarios in `05-security.md` §8 now runs as a signed-in real user against the actual applied migrations, asserting on what Postgres/PostgREST actually returns rather than a value the test itself supplied to a mock:
+
+1. Intern reads another intern's submission — `.select().eq('id', ...)` returns `[]`, no error (RLS filters the row, doesn't 403 at this layer — the app-level 403 for this exact case is already covered by the mocked `getSubmissionDetails()` test in `adversarial.test.ts`; this file proves the DB-layer backstop independently)
+2. Approver acts on a step not assigned to them — direct `approvals` insert by a non-holder is rejected by the `WITH CHECK` on "Approvers can insert approvals"
+3. Approver acts after reassignment — same insert, now rejected for the *previous* holder once `current_holder_id` has moved
+4. Intern calls an admin-only endpoint — the self-role-escalation regression above, plus a denied `routing_templates` insert
+5. Edit an approved submission — owner and non-admin approver both get 0 rows affected (RLS silently excludes the row from the UPDATE's match set rather than erroring — this took one iteration to get the assertion right; see comment in the test file)
+6. Direct storage access bypassing a signed URL — `submissions` bucket download denied for owner and non-owner alike (`USING (false)`, migration 11)
+7. Client-side fetch of a stored signature image — `signatures` bucket download denied for owner and non-owner alike (`USING (false)`, migration 4)
+
+`adversarial.test.ts` (mocked business-logic unit tests) is unchanged and still valuable — it exercises `lib/data/*`'s actual validation and error-message logic under controlled inputs, which is a different, complementary layer from what RLS enforces. Kept both.
+
+Wired into CI (`.github/workflows/ci.yml`): added `npx supabase start` before the test step and `npx supabase stop` after, so `npm run test` in CI now runs against the same real, migrated Postgres instance — this is what makes the suite actually merge-blocking rather than merely present.
+
+All 40 tests pass (`npm run test`), `npx tsc --noEmit` clean (aside from the pre-existing, unrelated `retention/page.tsx` errors carried forward from prior passes), `npm run lint` clean.
+
+### Updated gap table (supersedes gap #13 in the 2026-08-27 baseline table above)
+
+| # | Gap | FR | Severity | Status |
+|---|---|---|---|---|
+| 13 | FR-26 adversarial suite was entirely mock-based, covered 2/7 scenarios end to end | FR-26 | High | **Resolved** this pass — real suite, 7/7, wired into CI |
+| 17 | `public.users` UPDATE RLS policy had no `WITH CHECK`, allowing self role escalation to `system_admin` | FR-2/FR-26 #4, R5 | **Critical** | **Resolved** this pass |
+
+### Notes
+The stale local-DB mismatch (see "Environment change" above) is the reason gap #13 stayed a mock-only suite for as long as it did — every prior audit pass reasoned about RLS policies by reading the migration SQL, which is exactly the kind of check that can't distinguish "the policy in the file" from "the policy actually enforced by the running instance." Worth carrying forward as a standing practice: before trusting any local-Supabase-backed test result, confirm `npx supabase migration list` agrees with `ls supabase/migrations/`, or just `db reset` unconditionally if there's any doubt.
+
+## Audit — 2026-08-27 (Phase 5) — FR-25 privacy notice acknowledgment
+
+### Requirement traceability
+- [x] FR-25 acceptance criteria re-read before implementing, not assumed from the task list wording alone: "A privacy notice is shown and acknowledged at first login and the acknowledgement recorded" (`prd-intern-docflow.md` line 179); G5 target is 100% of users acknowledged.
+
+### What shipped
+- `20240101000013_privacy_notice_acknowledgment.sql` — adds `users.privacy_acknowledged_at TIMESTAMPTZ`, nullable. No RLS change needed: the existing "Users can update own row" policy already covers a user setting this on their own row, and the migration-12 self-role-escalation trigger only restricts `role`.
+- `lib/data/privacy.ts` — `getPrivacyAcknowledgmentStatus()` / `acknowledgePrivacyNotice()`; the latter writes the timestamp and a `PRIVACY_NOTICE_ACKNOWLEDGED` audit entry (actor, target, source IP), matching the pattern every other state-changing action in this codebase follows (05-security.md §7).
+- `src/app/privacy-notice/page.tsx` — the notice + a required "I have read and understood" checkbox gating a `Continue` button. Reached before any workflow surface: wired into `src/app/page.tsx` (the post-login router) and into all four role layouts (`intern`, `approver`, `admin`, `system-admin`), plus `src/app/onboarding/page.tsx` directly since that route had no layout of its own to hook into and is otherwise reachable by direct link before the root router's redirect ever runs. A user who has already acknowledged is redirected away from `/privacy-notice` itself, back through `/`.
+- Click-tested end to end against the local instance (not just unit-tested): signed in as a fresh intern with `privacy_acknowledged_at` null → landed on `/privacy-notice` → native `required` validation blocked `Continue` with the checkbox unchecked → checked it, submitted → redirected to `/onboarding` (this intern had no internship dates yet, confirming the privacy gate runs *before* the existing onboarding gate) → re-visited `/privacy-notice` directly → redirected away, confirming it doesn't re-prompt. Verified directly against the database that `privacy_acknowledged_at` was set and the `PRIVACY_NOTICE_ACKNOWLEDGED` audit row was written with the correct actor/target/IP.
+
+### Known gap — the notice text itself is a draft, not final legal copy
+`prd-intern-docflow.md` §14 marks two facts this notice would normally need as `[NEEDS INPUT]`, still unanswered by Makerspace: the named Data Protection Officer (RA 10173 requires a named individual, not the organisation itself, to be registered with the NPC as DPO) and Carl's surname/formal title. Rather than invent either, the shipped notice describes data collected, purpose, legal basis, access scoping, and retention (all facts already established elsewhere in this codebase/PRD), and directs privacy requests to "your Makerspace program coordinator" instead of a named DPO contact. **This must be revisited before pilot/go-live** — swap in the real DPO's name and contact details once Makerspace provides them, per `13-plan-redo-organization.md`'s change-control convention for PRD gaps. Flagging this here rather than treating FR-25 as fully closed: the *mechanism* (gate, recording, audit trail) is done and tested; the *legal content* has a known, tracked placeholder.
+
+### Verification
+`npx tsc --noEmit` clean (aside from the pre-existing, unrelated `retention/page.tsx` errors), `npm run lint` clean, `npm run test` 45/45 (7 files, including a new `__tests__/privacy.test.ts`), `npx secretlint "**/*"` clean.
+
+## Audit — 2026-08-27 (Phase 5) — Accessibility scan + keyboard pass, WCAG 2.1 AA
+
+### Method
+Automated: installed `axe-core` (devDependency), loaded it into the live local app in the Browser pane and ran `axe.run()` scoped to `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa` rule tags against the full rendered DOM on each page, signed in as a real user of each role (fresh test users seeded and deleted afterward, not committed to any migration/seed file). Manual: real keyboard interaction (Tab, Escape, native `disabled`-state checks) against the dialogs already built around Radix `Dialog` and native `disabled` buttons this Phase 5 pass and the previous one.
+
+**This is a real interactive scan run this session, not a standing CI check** — unlike FR-26, it is not wired into `.github/workflows/ci.yml`. Doing that properly needs `@axe-core/playwright` or equivalent, which needs Playwright installed first (gap #14, still open — see `Next steps` below). Treat this pass the same way as the backup-restore rehearsal below: a one-time verification that something works today, not an automated regression gate going forward.
+
+### Pages/states covered
+`/login` (unauthenticated) · `/privacy-notice` (fresh, unacknowledged intern) · `/onboarding` · `/intern` + its upload dialog (Escape-to-close verified) · `/approver` · `/approver/signature` + its "Save this signature?" preview-confirm dialog · `/admin/dashboard` · `/admin/requirements` · `/admin/routing-templates` · `/admin/users` (+ invite form) · `/admin/final-approval` · `/system-admin` · `/system-admin/users` · `/system-admin/audit-log` · `/system-admin/retention` + its "Run retention sweep now?" typed-confirmation dialog (verified the `Run Sweep` button carries the native `disabled` attribute until `PURGE` is typed, and that Escape dismisses it without triggering the sweep).
+
+**Not covered** (no silent claim of completeness): `/admin/submissions/[id]`, `/system-admin` sub-flows beyond what's listed, `SubmissionTimelineModal`, and any state that needs a populated dataset the fresh local DB didn't have (e.g. a genuinely overflowing dashboard matrix or audit log with many rows — see below for how this was handled instead).
+
+### Findings, all fixed in this pass
+1. **`src/app/privacy-notice/page.tsx`** — the scrollable notice-body `<div>` (`overflow-y-auto`) had no keyboard access (axe: `scrollable-region-focusable`, serious). A keyboard-only user could not scroll it to read the rest of the notice. Fixed: `tabIndex={0}` + `role="region"` + `aria-label`.
+2. **`AdminDashboardMatrix.tsx`** — 3 filter `<select>` elements (Requirement/State/Approver) had a visually-adjacent `<label>` with no `htmlFor`/`id` link, so they had no accessible name (axe: `select-name`, **critical**). Fixed with matching `id`/`htmlFor` pairs.
+3. **`AdminInviteForm.tsx`** — same unlinked-label pattern on the invite email input and role `<select>` (axe: `select-name`, critical, on `/admin/users`). Fixed the same way.
+4. **`AuditLogTable.tsx`** — same unlinked-label pattern on the Actor/Action filter selects (axe: `select-name`, critical, on `/system-admin/audit-log`). Fixed the same way.
+5. **`AdminRequirementManager.tsx`** and **`AdminRoutingTemplateManager.tsx`** — a "Version N" / step-role badge used `text-slate-500` on `bg-slate-100`/`bg-slate-200/60`, below the 4.5:1 AA threshold for small text (axe: `color-contrast`, serious). Every structurally identical badge elsewhere in the codebase (`UserManagementTable.tsx`, `AuditLogTable.tsx`, `InternChecklist.tsx`, `ApproverQueue.tsx`) already uses `text-slate-600`/`text-slate-700` on the same background — these two were the only outliers, not a deliberate design choice. Fixed to `text-slate-700` to match the established pattern.
+6. **`AuditLogTable.tsx`** — the wide table's `overflow-x-auto` wrapper (min-width 800px content) had no keyboard access, same `scrollable-region-focusable` issue as #1, on `/system-admin/audit-log`.
+
+### Preventive fix, not scan-confirmed on every page
+Finding #6 only triggers axe's rule when the region is *actually* overflowing at scan time — with a freshly-reset local DB and no seed data, `/admin/dashboard`'s matrix and `/approver`'s queue table were both too empty to overflow, so the same `overflow-x-auto` pattern in `AdminDashboardMatrix.tsx`, `UserManagementTable.tsx`, `ApproverQueue.tsx`, and `system-admin/retention/page.tsx` (the purge-log table) could not be scan-confirmed as broken there. Since it's the exact same structural pattern already proven broken twice (findings #1 and #6) and the fix is free (a `tabIndex`/`role`/`aria-label` triple that does nothing when the region isn't scrollable), applied it to all four preventively rather than leaving them to fail silently once real data makes them overflow. Flagging this distinction explicitly per the "no silent caps" principle — these four are *not* scan-confirmed, they're pattern-matched against a confirmed defect.
+
+### Keyboard pass, manual
+- Upload dialog (`/intern`), signature preview-confirm dialog (`/approver/signature`), retention-sweep confirm dialog (`/system-admin/retention`): all close on Escape, confirmed by checking the interactive element tree before and after the keypress.
+- Retention sweep's typed-confirmation `Run Sweep` button: confirmed `disabled === true` in the DOM until the exact string `PURGE` is present, which also makes it correctly unreachable by Tab while disabled (native semantics, not a custom aria-disabled workaround).
+- Privacy notice checkbox: confirmed the browser's native `required` validation blocks form submission with a visible prompt when unchecked, without any custom JS needed.
+
+### Verification
+`npx tsc --noEmit` clean (aside from the pre-existing, unrelated `retention/page.tsx` errors — confirmed the one line touched there, the `overflow-x-auto` wrapper, is untouched by and does not touch those errors), `npm run lint` clean, `npm run test` 45/45.
+
+### Next steps this pass did not cover
+Installing Playwright + `@axe-core/playwright` to make this a standing CI gate (gap #14) rather than a manual re-run is the natural follow-up, and would also close the remaining "not covered" pages above with realistic seeded data instead of an empty local DB.
+
+## Audit — 2026-08-27 (Phase 5) — Backup/restore rehearsal, first real run
+
+Full rehearsal log lives in `docs/14-backup-restore-runbook.md`'s "Rehearsal Log" table — this entry is the short version plus what it means for the audit trail.
+
+Seeded one realistic row per table (user, submission, version, approval, audit entry) into the local instance, recorded baseline row counts, took a real data-only backup (`supabase db dump --data-only --use-copy --schema public,auth`), simulated total data loss (`supabase db reset`), restored the backup, and confirmed both the row counts and the actual joined content of the restored rows matched exactly. Also re-ran the runbook's RLS-enabled, append-only-grant, and private-bucket verification queries against the restored database — all passed.
+
+**Two documentation defects in the runbook itself, found only by actually running it, not by reading it:**
+- `db dump --local -f backup.sql` (as originally written) is schema-only, not "schema + data" as the runbook claimed — confirmed by grepping the output for zero `INSERT`/`COPY` statements. The correct data command needs `--data-only`, and needs `--schema public,auth` since `public.users`/`audit_log` both have foreign keys into `auth.users`.
+- The runbook documented a `privacy_acknowledgements` table that was never built — FR-25 (this same Phase 5 pass, above) shipped `users.privacy_acknowledged_at` as a column instead. The runbook's table list and verification queries referenced a table that doesn't exist.
+
+Both are fixed in the runbook now. Neither would have been caught by re-reading the document — only by executing it against a real database, which is exactly why this rehearsal requirement exists as its own PRD gate rather than being assumed from "we wrote a runbook."
+
+**Not exercised this pass**: storage bucket object backup/restore (section 2/4 of the runbook) and the stale-file-bytes retention check (query 5d) — the rehearsal dataset had no actual uploaded file bytes and nothing old enough to be retention-eligible. Recommend a follow-up rehearsal that includes a real file upload through the storage backup/restore cycle before this is considered fully proven end-to-end.
+
+All rehearsal data, the dump files, and the temporary `.rehearsal-tmp/` directory were deleted after verification; nothing from this rehearsal is committed to the repo or the local database's current state.

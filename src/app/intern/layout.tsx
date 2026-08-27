@@ -13,9 +13,13 @@ export default async function InternLayout({ children }: { children: React.React
 
   const { data: dbUser } = await supabase
     .from('users')
-    .select('email, internship_end')
+    .select('email, internship_end, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
+
+  if (!dbUser?.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
+  }
 
   let daysRemaining = null;
   if (dbUser?.internship_end) {

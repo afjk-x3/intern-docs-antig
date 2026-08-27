@@ -71,8 +71,8 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 ## Phase 5 — Hardening & Pilot (Week 7, FR-25, FR-26, NFRs)
 
 - [x] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
-- [ ] Privacy notice shown and acknowledged at first login, acknowledgement recorded
-- [ ] Full FR-26 adversarial suite green in CI, blocking merge:
+- [x] Privacy notice shown and acknowledged at first login, acknowledgement recorded
+- [x] Full FR-26 adversarial suite green in CI, blocking merge:
   - intern reads another intern's submission
   - approver acts on an unassigned step
   - approver acts after reassignment
@@ -80,8 +80,8 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
   - edit attempt on an approved submission
   - direct storage access without a signed URL
   - client-side fetch of a stored signature image
-- [ ] Automated accessibility scan + manual keyboard pass, WCAG 2.1 AA
-- [ ] Backup restore rehearsed at least once
+- [x] Automated accessibility scan + manual keyboard pass, WCAG 2.1 AA
+- [x] Backup restore rehearsed at least once (database; storage object backup/restore not yet exercised — see `14-backup-restore-runbook.md` rehearsal log, 2026-08-27)
 - [ ] Pilot: 3–5 real DTRs through the full flow with the actual approver signing
 
 ## Phase 6 — Handover (Week 8)

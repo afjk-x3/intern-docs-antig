@@ -119,8 +119,9 @@ export function AdminInviteForm({
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-text-primary mb-1">Email Address</label>
+          <label htmlFor="invite-email" className="block text-xs font-semibold text-text-primary mb-1">Email Address</label>
           <input
+            id="invite-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -130,8 +131,9 @@ export function AdminInviteForm({
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-text-primary mb-1">Role</label>
+          <label htmlFor="invite-role" className="block text-xs font-semibold text-text-primary mb-1">Role</label>
           <select
+            id="invite-role"
             value={role}
             disabled={allowedRoles.length <= 1}
             onChange={(e) => setRole(e.target.value)}

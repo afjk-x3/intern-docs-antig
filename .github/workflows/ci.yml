@@ -40,5 +40,17 @@ jobs:
     - name: Secretlint
       run: npx secretlint "**/*"
 
+    # __tests__/auth/rls-integration.test.ts (FR-26, docs/05-security.md §8) asserts
+    # real Postgres RLS behavior, not mocked responses -- it needs a live instance with
+    # this repo's actual migrations applied. `supabase start` applies them automatically.
+    # This is what makes the FR-26 suite genuinely merge-blocking (01-tasks.md,
+    # 02-dev-guide.md) rather than just green against its own assumptions.
+    - name: Start local Supabase
+      run: npx supabase start
+
     - name: Run tests
       run: npm run test
+
+    - name: Stop local Supabase
+      if: always()
+      run: npx supabase stop

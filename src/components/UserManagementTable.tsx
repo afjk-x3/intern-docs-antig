@@ -140,7 +140,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
       </div>
 
       {/* User Table */}
-      <div className="overflow-x-auto border border-border-default rounded-xl">
+      <div className="overflow-x-auto border border-border-default rounded-xl" tabIndex={0} role="region" aria-label="User list">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-border-default text-text-muted bg-surface-muted">

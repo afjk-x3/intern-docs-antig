@@ -164,15 +164,15 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Requirement</label>
-            <select className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterReq} onChange={e => setFilterReq(e.target.value)}>
+            <label htmlFor="filter-requirement" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Requirement</label>
+            <select id="filter-requirement" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterReq} onChange={e => setFilterReq(e.target.value)}>
               <option value="ALL">All Requirements</option>
               {data.requirements.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">State</label>
-            <select className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterState} onChange={e => setFilterState(e.target.value)}>
+            <label htmlFor="filter-state" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">State</label>
+            <select id="filter-state" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterState} onChange={e => setFilterState(e.target.value)}>
               <option value="ALL">All States</option>
               <option value="NOT_STARTED">Not Started</option>
               <option value="IN_REVIEW">In Review</option>
@@ -182,8 +182,8 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Approver</label>
-            <select className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterApprover} onChange={e => setFilterApprover(e.target.value)}>
+            <label htmlFor="filter-approver" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Approver</label>
+            <select id="filter-approver" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterApprover} onChange={e => setFilterApprover(e.target.value)}>
               <option value="ALL">All Approvers</option>
               {approvers.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -201,7 +201,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
       </div>
 
       <div className="bg-surface-bg border border-border-default rounded-xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Intern requirement completion matrix">
           <table className="w-full text-left text-sm border-collapse">
             <thead className="bg-slate-50 border-b border-border-default text-xs text-text-muted sticky top-0 z-20 shadow-xs">
               <tr>

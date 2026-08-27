@@ -13,12 +13,16 @@ export default async function ApproverLayout({ children }: { children: React.Rea
 
   const { data: dbUser } = await supabase
     .from('users')
-    .select('email, role')
+    .select('email, role, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(dbUser.role)) {
     redirect('/login');
+  }
+
+  if (!dbUser.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
   }
 
   const navItems = [

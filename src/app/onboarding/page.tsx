@@ -1,5 +1,6 @@
 import { updateInternshipDates } from '@lib/data/users';
 import { redirect } from 'next/navigation';
+import { createClient } from '@lib/supabase/server';
 
 export default async function OnboardingPage({
   searchParams,
@@ -8,6 +9,22 @@ export default async function OnboardingPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const error = resolvedSearchParams.error;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/login');
+  }
+
+  const { data: dbUser } = await supabase
+    .from('users')
+    .select('privacy_acknowledged_at')
+    .eq('id', user.id)
+    .single();
+
+  if (!dbUser?.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
+  }
 
   async function handleOnboarding(formData: FormData) {
     'use server';

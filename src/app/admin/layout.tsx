@@ -13,12 +13,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: dbUser } = await supabase
     .from('users')
-    .select('email, role')
+    .select('email, role, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
 
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
     redirect('/login');
+  }
+
+  if (!dbUser.privacy_acknowledged_at) {
+    redirect('/privacy-notice');
   }
 
   const navItems = [
