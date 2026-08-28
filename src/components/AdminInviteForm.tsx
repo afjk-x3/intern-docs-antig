@@ -12,6 +12,9 @@ export interface RoleOption {
 interface AdminInviteFormProps {
   onInviteAction: (formData: FormData) => Promise<{ success?: boolean; error?: string; inviteLink?: string | null }>;
   allowedRoles?: RoleOption[];
+  /** Distinct school/batch values already in use, offered as autocomplete suggestions to keep group names consistent. */
+  existingSchools?: string[];
+  existingBatches?: string[];
 }
 
 export function AdminInviteForm({
@@ -21,13 +24,20 @@ export function AdminInviteForm({
     { value: 'approver', label: 'Approver' },
     { value: 'admin', label: 'Admin' },
   ],
+  existingSchools = [],
+  existingBatches = [],
 }: AdminInviteFormProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(allowedRoles[0]?.value || 'intern');
+  const [school, setSchool] = useState('');
+  const [batch, setBatch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ email: string; role: string; inviteLink?: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const targetRole = allowedRoles.length === 1 ? allowedRoles[0].value : role;
+  const isInternInvite = targetRole === 'intern';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +45,13 @@ export function AdminInviteForm({
     setSuccessInfo(null);
     setCopied(false);
 
-    const targetRole = allowedRoles.length === 1 ? allowedRoles[0].value : role;
     const formData = new FormData();
     formData.set('email', email);
     formData.set('role', targetRole);
+    if (isInternInvite) {
+      formData.set('school', school.trim());
+      formData.set('batch', batch.trim());
+    }
 
     setIsSubmitting(true);
     try {
@@ -51,6 +64,8 @@ export function AdminInviteForm({
         inviteLink: res.inviteLink || null,
       });
       setEmail('');
+      setSchool('');
+      setBatch('');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send invitation';
       setErrorMsg(msg);
@@ -151,6 +166,40 @@ export function AdminInviteForm({
             ))}
           </select>
         </div>
+        {isInternInvite && (
+          <>
+            <div>
+              <label htmlFor="invite-school" className="block text-xs font-semibold text-text-primary mb-1">School <span className="font-normal text-text-muted">(optional)</span></label>
+              <input
+                id="invite-school"
+                type="text"
+                list="invite-school-options"
+                value={school}
+                onChange={(e) => setSchool(e.target.value)}
+                placeholder="e.g. De La Salle University"
+                className="w-full border border-border-default rounded-xl p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
+              />
+              <datalist id="invite-school-options">
+                {existingSchools.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            </div>
+            <div>
+              <label htmlFor="invite-batch" className="block text-xs font-semibold text-text-primary mb-1">Batch <span className="font-normal text-text-muted">(optional)</span></label>
+              <input
+                id="invite-batch"
+                type="text"
+                list="invite-batch-options"
+                value={batch}
+                onChange={(e) => setBatch(e.target.value)}
+                placeholder="e.g. Batch 2026-1"
+                className="w-full border border-border-default rounded-xl p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-brand-primary focus:border-brand-primary outline-none"
+              />
+              <datalist id="invite-batch-options">
+                {existingBatches.map((b) => <option key={b} value={b} />)}
+              </datalist>
+            </div>
+          </>
+        )}
         <div className="flex items-end">
           <Button type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? 'Generating Invite...' : 'Send Invite'}

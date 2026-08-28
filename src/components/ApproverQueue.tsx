@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { XIcon } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { RequirementRecord, SubmissionVersionRecord } from '@lib/data/submissions';
@@ -21,7 +21,7 @@ export interface ApproverQueueItem {
   updated_at: string;
   isOverdue: boolean;
   waitingHours: number;
-  users?: { id: string; email: string };
+  users?: { id: string; email: string; school?: string | null; batch?: string | null };
   requirements?: RequirementRecord | null;
   routing_snapshot?: { sla_days?: number } | null;
   activeVersion: SubmissionVersionRecord | null;
@@ -85,6 +85,25 @@ export function ApproverQueue({
   const [actionError, setActionError] = useState<string | null>(null);
   const [timelineSubId, setTimelineSubId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [filterSchool, setFilterSchool] = useState<string>('ALL');
+  const [filterBatch, setFilterBatch] = useState<string>('ALL');
+
+  const schoolOptions = useMemo(
+    () => Array.from(new Set(items.map((i) => i.users?.school).filter((s): s is string => !!s))).sort(),
+    [items]
+  );
+  const batchOptions = useMemo(
+    () => Array.from(new Set(items.map((i) => i.users?.batch).filter((b): b is string => !!b))).sort(),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    return items.filter((i) => {
+      const matchesSchool = filterSchool === 'ALL' || i.users?.school === filterSchool;
+      const matchesBatch = filterBatch === 'ALL' || i.users?.batch === filterBatch;
+      return matchesSchool && matchesBatch;
+    });
+  }, [items, filterSchool, filterBatch]);
 
   const openApproveModal = (sub: ApproverQueueItem) => {
     setSelectedSub(sub);
@@ -229,20 +248,58 @@ export function ApproverQueue({
           </div>
         )}
         <div className="flex items-center gap-3">
+          {(schoolOptions.length > 0 || batchOptions.length > 0) && (
+            <div className="flex items-end gap-2">
+              {schoolOptions.length > 0 && (
+                <div>
+                  <label htmlFor="queue-filter-school" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">School</label>
+                  <select
+                    id="queue-filter-school"
+                    value={filterSchool}
+                    onChange={(e) => setFilterSchool(e.target.value)}
+                    className="text-xs p-1.5 rounded border border-border-default bg-surface-muted"
+                  >
+                    <option value="ALL">All Schools</option>
+                    {schoolOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+              {batchOptions.length > 0 && (
+                <div>
+                  <label htmlFor="queue-filter-batch" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Batch</label>
+                  <select
+                    id="queue-filter-batch"
+                    value={filterBatch}
+                    onChange={(e) => setFilterBatch(e.target.value)}
+                    className="text-xs p-1.5 rounded border border-border-default bg-surface-muted"
+                  >
+                    <option value="ALL">All Batches</option>
+                    {batchOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
           <div className="text-right">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Pending Review</span>
-            <p className="text-lg font-bold text-amber-600">{items.length}</p>
+            <p className="text-lg font-bold text-amber-600">{filteredItems.length}{filteredItems.length !== items.length ? ` / ${items.length}` : ''}</p>
           </div>
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <div className="bg-surface-bg rounded-xl border border-border-default p-12 text-center">
           <svg className="mx-auto h-12 w-12 text-text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h3 className="text-base font-semibold text-text-primary">All caught up!</h3>
-          <p className="text-sm text-text-muted mt-1">There are no submissions currently awaiting your review.</p>
+          <h3 className="text-base font-semibold text-text-primary">
+            {items.length === 0 ? 'All caught up!' : 'No matches for this filter'}
+          </h3>
+          <p className="text-sm text-text-muted mt-1">
+            {items.length === 0
+              ? 'There are no submissions currently awaiting your review.'
+              : 'No pending submissions match the selected school/batch. Try clearing the filter.'}
+          </p>
         </div>
       ) : (
         <div className="bg-surface-bg rounded-xl border border-border-default shadow-xs overflow-hidden">
@@ -259,7 +316,7 @@ export function ApproverQueue({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {items.map((sub) => {
+                {filteredItems.map((sub) => {
                   const activeVer = sub.activeVersion;
                   const slaDays = sub.routing_snapshot?.sla_days ?? sub.requirements?.routing_templates?.sla_days ?? 2;
                   const waitToneClass = waitTimeToneClass(sub.waitingHours, slaDays);
@@ -267,6 +324,11 @@ export function ApproverQueue({
                     <tr key={sub.id} className="hover:bg-surface-hover transition-colors align-top">
                       <td className="px-6 py-4 font-medium text-text-primary align-top">
                         {sub.users?.email || 'Unknown'}
+                        {(sub.users?.school || sub.users?.batch) && (
+                          <div className="text-[10px] font-normal text-text-muted">
+                            {[sub.users?.school, sub.users?.batch].filter(Boolean).join(' · ')}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-text-primary align-top">
                         <div className="font-semibold">{sub.requirements?.name}</div>

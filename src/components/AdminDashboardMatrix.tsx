@@ -12,6 +12,8 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
   const [filterReq, setFilterReq] = useState<string>('ALL');
   const [filterState, setFilterState] = useState<string>('ALL');
   const [filterApprover, setFilterApprover] = useState<string>('ALL');
+  const [filterSchool, setFilterSchool] = useState<string>('ALL');
+  const [filterBatch, setFilterBatch] = useState<string>('ALL');
   const [isExporting, setIsExporting] = useState(false);
   const [viewMode, setViewMode] = useState<'needs-action' | 'full'>('needs-action');
 
@@ -23,6 +25,19 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
     });
     return Array.from(set).sort();
   }, [data.submissions]);
+
+  // Derive unique schools/batches for group filter dropdowns
+  const schools = useMemo(() => {
+    const set = new Set<string>();
+    data.interns.forEach(i => { if (i.school) set.add(i.school); });
+    return Array.from(set).sort();
+  }, [data.interns]);
+
+  const batches = useMemo(() => {
+    const set = new Set<string>();
+    data.interns.forEach(i => { if (i.batch) set.add(i.batch); });
+    return Array.from(set).sort();
+  }, [data.interns]);
 
   // Summary counts across the whole cohort, independent of the current filters -- these
   // drive the chip row above the grid.
@@ -39,6 +54,9 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
 
   const dropdownFilteredInterns = useMemo(() => {
     return data.interns.filter(intern => {
+      if (filterSchool !== 'ALL' && intern.school !== filterSchool) return false;
+      if (filterBatch !== 'ALL' && intern.batch !== filterBatch) return false;
+
       if (filterReq === 'ALL' && filterState === 'ALL' && filterApprover === 'ALL') return true;
 
       const internSubs = data.submissions.filter(s => s.intern_id === intern.id);
@@ -63,7 +81,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
       }
       return matches;
     });
-  }, [data, filterReq, filterState, filterApprover]);
+  }, [data, filterReq, filterState, filterApprover, filterSchool, filterBatch]);
 
   const dropdownFilteredRequirements = useMemo(() => {
     if (filterReq === 'ALL') return data.requirements;
@@ -114,7 +132,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
     try {
       // In a real app we'd call a server action here to audit log and get the CSV.
       // For now we'll do a client-side export and assume the server route is used for the real FR-6.
-      const res = await fetch(`/api/admin/export?req=${filterReq}&state=${filterState}&appr=${filterApprover}`);
+      const res = await fetch(`/api/admin/export?req=${filterReq}&state=${filterState}&appr=${filterApprover}&school=${encodeURIComponent(filterSchool)}&batch=${encodeURIComponent(filterBatch)}`);
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -206,6 +224,24 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
               {approvers.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+          {schools.length > 0 && (
+            <div>
+              <label htmlFor="filter-school" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">School</label>
+              <select id="filter-school" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
+                <option value="ALL">All Schools</option>
+                {schools.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          {batches.length > 0 && (
+            <div>
+              <label htmlFor="filter-batch" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Batch</label>
+              <select id="filter-batch" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
+                <option value="ALL">All Batches</option>
+                {batches.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex items-end">
           <Button onClick={handleExport} disabled={isExporting} variant="outline">
@@ -234,6 +270,11 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
                 <tr key={intern.id} className="hover:bg-surface-hover transition-colors align-top">
                   <td className="px-4 py-3 border-r border-border-default bg-white sticky left-0 z-10 align-top">
                     <div className="font-medium text-text-primary truncate" title={intern.email}>{intern.email}</div>
+                    {(intern.school || intern.batch) && (
+                      <div className="text-[10px] text-text-muted truncate">
+                        {[intern.school, intern.batch].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </td>
                   {requirementsToRender.map(req => {
                     const sub = data.submissions.find(s => s.intern_id === intern.id && s.requirement_id === req.id);

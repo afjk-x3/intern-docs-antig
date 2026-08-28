@@ -7,6 +7,8 @@ export interface DashboardIntern {
   email: string;
   internship_start: string | null;
   internship_end: string | null;
+  school: string | null;
+  batch: string | null;
 }
 
 export interface DashboardRequirement {
@@ -46,7 +48,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   // Fetch interns
   const { data: interns, error: internsError } = await adminClient
     .from('users')
-    .select('id, email, internship_start, internship_end')
+    .select('id, email, internship_start, internship_end, school, batch')
     .eq('role', 'intern')
     .order('email');
 

@@ -26,6 +26,7 @@
     "react-dom": "19.2.8",
     "resend": "^6.21.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.4",
     "tailwind-merge": "^3.6.0",
     "vitest": "^4.1.11",
     "zod": "^4.4.3"

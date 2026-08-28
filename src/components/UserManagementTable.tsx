@@ -11,29 +11,73 @@ export interface ManagedUser {
   role: 'intern' | 'approver' | 'admin' | 'system_admin' | string;
   internship_start?: string | null;
   internship_end?: string | null;
+  school?: string | null;
+  batch?: string | null;
   created_at: string;
 }
 
 interface UserManagementTableProps {
   users: ManagedUser[];
   onRoleChangeAction: (formData: FormData) => Promise<void>;
+  /** Saves an intern's school/batch group. Optional so this table still works anywhere groups aren't wired up. */
+  onGroupChangeAction?: (formData: FormData) => Promise<void>;
 }
 
-export function UserManagementTable({ users, onRoleChangeAction }: UserManagementTableProps) {
+export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAction }: UserManagementTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [schoolFilter, setSchoolFilter] = useState<string>('ALL');
+  const [batchFilter, setBatchFilter] = useState<string>('ALL');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pendingChange, setPendingChange] = useState<{ user: ManagedUser; nextRole: string } | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [groupDrafts, setGroupDrafts] = useState<Record<string, { school: string; batch: string }>>({});
+  const [savingGroupFor, setSavingGroupFor] = useState<string | null>(null);
+
+  const schoolOptions = useMemo(
+    () => Array.from(new Set(users.map((u) => u.school).filter((s): s is string => !!s))).sort(),
+    [users]
+  );
+  const batchOptions = useMemo(
+    () => Array.from(new Set(users.map((u) => u.batch).filter((b): b is string => !!b))).sort(),
+    [users]
+  );
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const matchesSearch = u.email.toLowerCase().includes(searchTerm.toLowerCase().trim());
       const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
-      return matchesSearch && matchesRole;
+      const matchesSchool = schoolFilter === 'ALL' || u.school === schoolFilter;
+      const matchesBatch = batchFilter === 'ALL' || u.batch === batchFilter;
+      return matchesSearch && matchesRole && matchesSchool && matchesBatch;
     });
-  }, [users, searchTerm, roleFilter]);
+  }, [users, searchTerm, roleFilter, schoolFilter, batchFilter]);
+
+  const getGroupDraft = (u: ManagedUser) => groupDrafts[u.id] ?? { school: u.school || '', batch: u.batch || '' };
+
+  const handleGroupFieldChange = (u: ManagedUser, field: 'school' | 'batch', value: string) => {
+    setGroupDrafts((prev) => ({ ...prev, [u.id]: { ...getGroupDraft(u), [field]: value } }));
+  };
+
+  const handleGroupSave = async (u: ManagedUser) => {
+    if (!onGroupChangeAction) return;
+    const draft = getGroupDraft(u);
+    if (draft.school === (u.school || '') && draft.batch === (u.batch || '')) return;
+
+    setSavingGroupFor(u.id);
+    try {
+      const formData = new FormData();
+      formData.set('userId', u.id);
+      formData.set('school', draft.school.trim());
+      formData.set('batch', draft.batch.trim());
+      await onGroupChangeAction(formData);
+      setStatusMessage('Group updated.');
+      setTimeout(() => setStatusMessage(null), 3000);
+    } finally {
+      setSavingGroupFor(null);
+    }
+  };
 
   const roleCounts = useMemo(() => {
     return {
@@ -82,7 +126,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
               {filteredUsers.length} of {users.length}
             </span>
           </h2>
-          <p className="text-xs text-text-muted mt-0.5">Filter by role or search by email address.</p>
+          <p className="text-xs text-text-muted mt-0.5">Filter by role, school, batch, or search by email address.</p>
         </div>
 
         {statusMessage && (
@@ -144,6 +188,40 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
         ))}
       </div>
 
+      {/* Group Filters (School / Batch) */}
+      {(schoolOptions.length > 0 || batchOptions.length > 0) && (
+        <div className="flex flex-wrap gap-3 text-xs">
+          {schoolOptions.length > 0 && (
+            <div>
+              <label htmlFor="filter-school" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">School</label>
+              <select
+                id="filter-school"
+                value={schoolFilter}
+                onChange={(e) => setSchoolFilter(e.target.value)}
+                className="p-1.5 rounded-lg border border-border-default bg-surface-muted text-xs text-text-primary outline-none"
+              >
+                <option value="ALL">All Schools</option>
+                {schoolOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          {batchOptions.length > 0 && (
+            <div>
+              <label htmlFor="filter-batch" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Batch</label>
+              <select
+                id="filter-batch"
+                value={batchFilter}
+                onChange={(e) => setBatchFilter(e.target.value)}
+                className="p-1.5 rounded-lg border border-border-default bg-surface-muted text-xs text-text-primary outline-none"
+              >
+                <option value="ALL">All Batches</option>
+                {batchOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* User Table */}
       <div className="overflow-x-auto border border-border-default rounded-xl" tabIndex={0} role="region" aria-label="User list">
         <table className="w-full text-left text-xs border-collapse">
@@ -151,6 +229,8 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
             <tr className="border-b border-border-default text-text-muted bg-surface-muted">
               <th className="py-3 px-4 font-semibold">User / Email</th>
               <th className="py-3 px-4 font-semibold">Current Role</th>
+              <th className="py-3 px-4 font-semibold">School</th>
+              <th className="py-3 px-4 font-semibold">Batch</th>
               <th className="py-3 px-4 font-semibold">Internship Dates</th>
               <th className="py-3 px-4 font-semibold">Change Role</th>
             </tr>
@@ -175,6 +255,44 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
                   >
                     {humanizeCode(u.role)}
                   </span>
+                </td>
+                <td className="py-3.5 px-4">
+                  {u.role === 'intern' && onGroupChangeAction ? (
+                    <>
+                      <label className="sr-only" htmlFor={`school-${u.id}`}>School for {u.email}</label>
+                      <input
+                        id={`school-${u.id}`}
+                        type="text"
+                        value={getGroupDraft(u).school}
+                        onChange={(e) => handleGroupFieldChange(u, 'school', e.target.value)}
+                        onBlur={() => handleGroupSave(u)}
+                        disabled={savingGroupFor === u.id}
+                        placeholder="—"
+                        className="w-32 rounded-lg border border-transparent hover:border-border-default focus:border-brand-primary bg-transparent p-1.5 text-xs text-text-primary outline-none disabled:opacity-50"
+                      />
+                    </>
+                  ) : (
+                    <span className="text-text-muted">{u.school || '—'}</span>
+                  )}
+                </td>
+                <td className="py-3.5 px-4">
+                  {u.role === 'intern' && onGroupChangeAction ? (
+                    <>
+                      <label className="sr-only" htmlFor={`batch-${u.id}`}>Batch for {u.email}</label>
+                      <input
+                        id={`batch-${u.id}`}
+                        type="text"
+                        value={getGroupDraft(u).batch}
+                        onChange={(e) => handleGroupFieldChange(u, 'batch', e.target.value)}
+                        onBlur={() => handleGroupSave(u)}
+                        disabled={savingGroupFor === u.id}
+                        placeholder="—"
+                        className="w-28 rounded-lg border border-transparent hover:border-border-default focus:border-brand-primary bg-transparent p-1.5 text-xs text-text-primary outline-none disabled:opacity-50"
+                      />
+                    </>
+                  ) : (
+                    <span className="text-text-muted">{u.batch || '—'}</span>
+                  )}
                 </td>
                 <td className="py-3.5 px-4 text-text-muted font-mono text-[11px]">
                   {u.internship_start && u.internship_end
@@ -203,7 +321,7 @@ export function UserManagementTable({ users, onRoleChangeAction }: UserManagemen
 
             {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-10 text-center text-text-muted">
+                <td colSpan={6} className="py-10 text-center text-text-muted">
                   <div className="space-y-1">
                     <p className="font-semibold text-text-primary">No users found</p>
                     <p className="text-xs">No registered accounts match your current filter or search.</p>

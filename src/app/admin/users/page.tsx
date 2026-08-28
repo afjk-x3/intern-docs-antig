@@ -1,13 +1,18 @@
 import { inviteUser } from '@lib/data/auth';
+import { getInternGroupOptions } from '@lib/data/users';
 import { AdminInviteForm } from '@/components/AdminInviteForm';
 
-export default function AdminUsersPage() {
+export default async function AdminUsersPage() {
+  const { schools, batches } = await getInternGroupOptions();
+
   async function handleInvite(formData: FormData) {
     'use server';
     try {
       const email = formData.get('email') as string;
+      const school = formData.get('school') as string;
+      const batch = formData.get('batch') as string;
       // Admins can only invite interns (approver & admin roles managed by system_admin)
-      const res = await inviteUser(email, 'intern');
+      const res = await inviteUser(email, 'intern', school, batch);
       return { success: true, inviteLink: res.inviteLink };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send invitation';
@@ -28,6 +33,8 @@ export default function AdminUsersPage() {
       <AdminInviteForm
         onInviteAction={handleInvite}
         allowedRoles={[{ value: 'intern', label: 'Intern' }]}
+        existingSchools={schools}
+        existingBatches={batches}
       />
     </div>
   );

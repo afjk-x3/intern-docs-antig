@@ -14,6 +14,7 @@ export interface SignatoryEntry {
   stepNumber?: number;
   roleTitle?: string;
   signaturePngBuffer: Buffer;
+  signatureMimeType?: 'image/png' | 'image/jpeg';
   approverName: string;
   approvalDate: Date;
 }
@@ -115,7 +116,9 @@ export async function compositeSignedPdf({
 
   for (let i = 0; i < totalSigs; i++) {
     const sig = allSignatories[i];
-    const signatureImage = await pdfDoc.embedPng(sig.signaturePngBuffer);
+    const signatureImage = sig.signatureMimeType === 'image/jpeg'
+      ? await pdfDoc.embedJpg(sig.signaturePngBuffer)
+      : await pdfDoc.embedPng(sig.signaturePngBuffer);
     const sigWidth = config.width || (totalSigs > 1 ? 120 : 140);
     const sigHeight = config.height || (signatureImage.height * (sigWidth / signatureImage.width));
 

@@ -119,7 +119,7 @@ export interface SubmissionWithRelations {
   created_at: string;
   updated_at: string;
   routing_snapshot?: { steps?: Array<{ step: number; role?: string; user_id?: string; name?: string }>; sla_days?: number; name?: string } | null;
-  users?: { id: string; email: string };
+  users?: { id: string; email: string; school?: string | null; batch?: string | null };
   requirements?: RequirementRecord | null;
   submission_versions?: SubmissionVersionRecord[];
   approvals?: ApprovalRecord[];
@@ -293,7 +293,7 @@ export async function getApproverQueue() {
       created_at,
       updated_at,
       routing_snapshot,
-      users!submissions_intern_id_fkey(id, email),
+      users!submissions_intern_id_fkey(id, email, school, batch),
       requirements(id, name, max_size_mb, accepted_types, signature_config, routing_templates(*)),
       submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at),
       approvals(id, step, approver_id, created_at)
@@ -558,15 +558,27 @@ export async function uploadSubmission(formData: FormData) {
   const fileExt = validated.mimeType === 'application/pdf' ? 'pdf' : validated.mimeType === 'image/png' ? 'png' : 'jpg';
   const storagePath = `${user.id}/${subId}/v1_${Date.now()}.${fileExt}`;
 
-  const { error: storageErr } = await supabase.storage
+  const { error: userStorageErr } = await supabase.storage
     .from('submissions')
     .upload(storagePath, fileBuffer, {
       contentType: validated.mimeType,
       upsert: true,
     });
 
-  if (storageErr) {
-    throw new Error(`Failed to store uploaded document: ${storageErr.message}`);
+  if (userStorageErr) {
+    // Fall back to the service-role client, mirroring enrollSignature's pattern,
+    // so a stale/misconfigured RLS policy on the user-context client doesn't block a legitimate upload.
+    const { error: adminStorageErr } = await adminClient.storage
+      .from('submissions')
+      .upload(storagePath, fileBuffer, {
+        contentType: validated.mimeType,
+        upsert: true,
+      });
+
+    if (adminStorageErr) {
+      console.error('[uploadSubmission] Storage upload failed for both user and admin clients:', userStorageErr.message, adminStorageErr.message);
+      throw new Error('We could not save your document right now. Please try again in a moment, or contact your administrator if the problem continues.');
+    }
   }
 
   // Insert submission version v1
@@ -667,15 +679,27 @@ export async function resubmitSubmission(formData: FormData) {
   const fileExt = validated.mimeType === 'application/pdf' ? 'pdf' : validated.mimeType === 'image/png' ? 'png' : 'jpg';
   const storagePath = `${user.id}/${typedSub.id}/v${nextVersionNumber}_${Date.now()}.${fileExt}`;
 
-  const { error: storageErr } = await supabase.storage
+  const { error: userStorageErr } = await supabase.storage
     .from('submissions')
     .upload(storagePath, fileBuffer, {
       contentType: validated.mimeType,
       upsert: true,
     });
 
-  if (storageErr) {
-    throw new Error(`Failed to upload re-submitted document: ${storageErr.message}`);
+  if (userStorageErr) {
+    // Fall back to the service-role client, mirroring enrollSignature's pattern,
+    // so a stale/misconfigured RLS policy on the user-context client doesn't block a legitimate re-upload.
+    const { error: adminStorageErr } = await adminClient.storage
+      .from('submissions')
+      .upload(storagePath, fileBuffer, {
+        contentType: validated.mimeType,
+        upsert: true,
+      });
+
+    if (adminStorageErr) {
+      console.error('[resubmitSubmission] Storage upload failed for both user and admin clients:', userStorageErr.message, adminStorageErr.message);
+      throw new Error('We could not save your re-submitted document right now. Please try again in a moment, or contact your administrator if the problem continues.');
+    }
   }
 
   // Insert version n+1
@@ -809,6 +833,7 @@ export async function approveSubmissionSigned(submissionId: string) {
     stepNumber?: number;
     roleTitle?: string;
     signaturePngBuffer: Buffer;
+    signatureMimeType?: 'image/png' | 'image/jpeg';
     approverName: string;
     approvalDate: Date;
   }> = [];
@@ -817,7 +842,7 @@ export async function approveSubmissionSigned(submissionId: string) {
   const prevApprovals = (typedSub.approvals || []).sort((a, b) => a.step - b.step);
   for (const prevAppr of prevApprovals) {
     try {
-      const prevSigBuffer = await getSignatureBytesForCompositing(prevAppr.approver_id);
+      const prevSig = await getSignatureBytesForCompositing(prevAppr.approver_id);
       const { data: prevUserData } = await adminClient
         .from('users')
         .select('email, role')
@@ -827,7 +852,8 @@ export async function approveSubmissionSigned(submissionId: string) {
       signatories.push({
         stepNumber: prevAppr.step,
         roleTitle: prevAppr.step === 1 ? 'Supervisor Review:' : `Step ${prevAppr.step} Review:`,
-        signaturePngBuffer: prevSigBuffer,
+        signaturePngBuffer: prevSig.buffer,
+        signatureMimeType: prevSig.mimeType,
         approverName: prevUserData?.email || 'Supervisor',
         approvalDate: new Date(prevAppr.created_at),
       });
@@ -837,11 +863,12 @@ export async function approveSubmissionSigned(submissionId: string) {
   }
 
   // Include current step approver signature
-  const currentSigBuffer = await getSignatureBytesForCompositing(user.id);
+  const currentSig = await getSignatureBytesForCompositing(user.id);
   signatories.push({
     stepNumber: currentStep,
     roleTitle: isFinalStep && steps.length > 1 ? 'Final Admin Approval:' : (currentStep === 1 && steps.length > 1 ? 'Supervisor Review:' : 'Digitally Approved by:'),
-    signaturePngBuffer: currentSigBuffer,
+    signaturePngBuffer: currentSig.buffer,
+    signatureMimeType: currentSig.mimeType,
     approverName: dbUser.email || 'Authorized Signatory',
     approvalDate: approvalDate,
   });

@@ -9,11 +9,22 @@ import { sendEmailWithRetry } from '../email/resend';
 const inviteSchema = z.object({
   email: z.string().email(),
   role: z.enum(['intern', 'approver', 'admin', 'system_admin']),
+  school: z.string().trim().max(200).optional(),
+  batch: z.string().trim().max(100).optional(),
 });
 
-const ACCEPT_INVITE_URL = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/accept-invite`;
+// Derived from the incoming request rather than NEXT_PUBLIC_SITE_URL: that env var
+// is inlined at build time, so it silently falls back to localhost in any deploy
+// where it wasn't set before the build ran (see the sign-out fix in
+// src/app/auth/signout/route.ts for the same reasoning).
+async function getAcceptInviteUrl(): Promise<string> {
+  const reqHeaders = await headers();
+  const host = reqHeaders.get('x-forwarded-host') || reqHeaders.get('host') || 'localhost:3000';
+  const proto = reqHeaders.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}/accept-invite`;
+}
 
-export async function inviteUser(email: string, role: string) {
+export async function inviteUser(email: string, role: string, school?: string, batch?: string) {
   const supabase = await createClient();
   const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
 
@@ -36,15 +47,16 @@ export async function inviteUser(email: string, role: string) {
     throw new Error('Forbidden: Administrators can only invite interns. Inviting staff roles requires System Administrator privileges.');
   }
 
-  const parsed = inviteSchema.parse({ email, role });
+  const parsed = inviteSchema.parse({ email, role, school, batch });
   const adminClient = createAdminClient();
+  const acceptInviteUrl = await getAcceptInviteUrl();
 
   let userId: string;
   let inviteLink: string | null = null;
 
   // 1. Try standard inviteUserByEmail
   const { data: invitedUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(parsed.email, {
-    redirectTo: ACCEPT_INVITE_URL,
+    redirectTo: acceptInviteUrl,
   });
 
   if (invitedUser?.user) {
@@ -55,7 +67,7 @@ export async function inviteUser(email: string, role: string) {
       type: 'invite',
       email: parsed.email,
       options: {
-        redirectTo: ACCEPT_INVITE_URL,
+        redirectTo: acceptInviteUrl,
       },
     });
 
@@ -75,7 +87,7 @@ export async function inviteUser(email: string, role: string) {
           type: 'magiclink',
           email: parsed.email,
           options: {
-            redirectTo: ACCEPT_INVITE_URL,
+            redirectTo: acceptInviteUrl,
           },
         });
         inviteLink = magicLinkData?.properties?.action_link || null;
@@ -90,6 +102,7 @@ export async function inviteUser(email: string, role: string) {
     id: userId,
     email: parsed.email,
     role: parsed.role,
+    ...(parsed.role === 'intern' ? { school: parsed.school || null, batch: parsed.batch || null } : {}),
   });
 
   if (insertError) {

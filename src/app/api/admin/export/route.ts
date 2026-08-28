@@ -18,16 +18,21 @@ export async function GET(request: Request) {
   const filterReq = searchParams.get('req') || 'ALL';
   const filterState = searchParams.get('state') || 'ALL';
   const filterApprover = searchParams.get('appr') || 'ALL';
+  const filterSchool = searchParams.get('school') || 'ALL';
+  const filterBatch = searchParams.get('batch') || 'ALL';
 
   // Fetch data
   const data = await getAdminDashboardData();
 
   // Apply filters identically to client
   const filteredInterns = data.interns.filter(intern => {
+    if (filterSchool !== 'ALL' && intern.school !== filterSchool) return false;
+    if (filterBatch !== 'ALL' && intern.batch !== filterBatch) return false;
+
     if (filterReq === 'ALL' && filterState === 'ALL' && filterApprover === 'ALL') return true;
 
     const internSubs = data.submissions.filter(s => s.intern_id === intern.id);
-    
+
     let matches = false;
     if (internSubs.length === 0) {
       if (filterState === 'NOT_STARTED' && filterApprover === 'ALL') matches = true;
@@ -51,14 +56,14 @@ export async function GET(request: Request) {
     : data.requirements.filter(r => r.id === filterReq);
 
   // Generate CSV string
-  let csv = 'Intern Email';
+  let csv = 'Intern Email,School,Batch';
   requirementsToRender.forEach(req => {
     csv += `,${req.name.replace(/,/g, '')}`;
   });
   csv += '\n';
 
   filteredInterns.forEach(intern => {
-    csv += `${intern.email}`;
+    csv += `${intern.email},${(intern.school || '').replace(/,/g, '')},${(intern.batch || '').replace(/,/g, '')}`;
     requirementsToRender.forEach(req => {
       const sub = data.submissions.find(s => s.intern_id === intern.id && s.requirement_id === req.id);
       const state = sub ? sub.state : 'NOT_STARTED';
@@ -78,7 +83,7 @@ export async function GET(request: Request) {
     target_id: null,
     target_type: 'system',
     source_ip: ip,
-    payload: { filterReq, filterState, filterApprover, resultCount: filteredInterns.length }
+    payload: { filterReq, filterState, filterApprover, filterSchool, filterBatch, resultCount: filteredInterns.length }
   });
 
   return new NextResponse(csv, {
