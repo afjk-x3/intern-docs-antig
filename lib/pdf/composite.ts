@@ -126,7 +126,7 @@ export async function compositeSignedPdf({
     const signatureImage = sig.signatureMimeType === 'image/jpeg'
       ? await pdfDoc.embedJpg(signatureBytes)
       : await pdfDoc.embedPng(signatureBytes);
-    const sigWidth = config.width || (totalSigs > 1 ? 120 : 140);
+    const sigWidth = config.width || (totalSigs > 1 ? 75 : 90);
     const sigHeight = config.height || (signatureImage.height * (sigWidth / signatureImage.width));
 
     let sigX: number;
@@ -159,29 +159,36 @@ export async function compositeSignedPdf({
       (totalSigs > 1
         ? `Step ${sig.stepNumber || i + 1} (${i === 0 ? 'Supervisor' : 'Final Admin'}):`
         : `Digitally Approved by:`);
+    const dateLine = `Date: ${dateStr}`;
+
+    // Centers each line under the (already full-width) signature image, on a shared
+    // vertical axis through the middle of the sigX..sigX+sigWidth column, rather than
+    // left-aligning text of varying width against the image's left edge.
+    const centeredX = (text: string, lineFont: typeof font, size: number) =>
+      sigX + (sigWidth - lineFont.widthOfTextAtSize(text, size)) / 2;
 
     // Draw attestation metadata below the signature -- printed name directly under the
-    // signature image (a signature is conventionally given *over* a printed name, like a
-    // signature line), then the role title and date beneath that.
+    // signature image, close enough to read as a signature given *on* a line just above
+    // its own printed name, then the role title and date beneath that.
     targetPage.drawText(sig.approverName, {
-      x: sigX,
-      y: Math.max(10, sigY - 10),
+      x: centeredX(sig.approverName, boldFont, fontSize),
+      y: Math.max(10, sigY - 3),
       size: fontSize,
       font: boldFont,
       color: rgb(0.1, 0.2, 0.3),
     });
 
     targetPage.drawText(title, {
-      x: sigX,
-      y: Math.max(10, sigY - 19),
+      x: centeredX(title, font, fontSize - 1),
+      y: Math.max(10, sigY - 12),
       size: fontSize - 1,
       font,
       color: rgb(0.3, 0.3, 0.3),
     });
 
-    targetPage.drawText(`Date: ${dateStr}`, {
-      x: sigX,
-      y: Math.max(10, sigY - 28),
+    targetPage.drawText(dateLine, {
+      x: centeredX(dateLine, font, fontSize - 1),
+      y: Math.max(10, sigY - 21),
       size: fontSize - 1,
       font,
       color: rgb(0.3, 0.3, 0.3),

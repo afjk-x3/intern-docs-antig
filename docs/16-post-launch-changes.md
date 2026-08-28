@@ -3,6 +3,22 @@
 Running log of decisions made after the Week 8 handover (see `08-implementation-plan.md`),
 for whoever picks this up next. Newest entries first.
 
+## 2026-08-28 — Shrunk the composited signature stamp
+
+`createRequirement()` hardcoded every new requirement's `signature_config` to a
+160x60pt stamp (`lib/data/requirements.ts`) -- with no UI to override it, every
+requirement ever created through the admin form got exactly that box. Composited onto
+an actual document it visibly dwarfed the 8pt printed-name/date text beneath it,
+especially on a 2-step document with two stamps side by side. Shrunk the default to
+90x34pt (same ~2.65:1 aspect ratio), and shrunk `compositeSignedPdf`'s own code-level
+fallback (used only when a requirement has no `signature_config` at all) from 140pt/120pt
+down to 90pt/75pt (single-/multi-signatory) to match.
+
+`20240101000020_shrink_signature_stamp_default.sql` backfills existing requirements
+still carrying the old 160x60 default so this applies without needing every requirement
+manually re-saved -- scoped to rows matching that exact old value, so anything already
+different is left alone.
+
 ## 2026-08-28 — Printed name profile (replaces email on approved documents)
 
 FR-11's acceptance criteria (`docs/prd-intern-docflow.md`) requires the composited

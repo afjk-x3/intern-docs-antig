@@ -26,7 +26,7 @@ export async function trimSignatureWhitespace(pngBuffer: Buffer): Promise<Buffer
   try {
     const trimmed = await sharp(pngBuffer)
       .trim({ threshold: 10 })
-      .extend({ top: 6, bottom: 6, left: 6, right: 6, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .extend({ top: 2, bottom: 2, left: 2, right: 2, background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
       .toBuffer();
     const { width, height } = await sharp(trimmed).metadata();
