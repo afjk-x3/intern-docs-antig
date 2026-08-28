@@ -49,6 +49,30 @@ export async function rasterizeToPng(buffer: Buffer): Promise<Buffer> {
   }
 }
 
+/**
+ * Turns a light/white background transparent based on per-pixel luminance -- appropriate
+ * for a photographed or scanned signature (dark ink on light paper), not general-purpose
+ * subject segmentation. Darker pixels (ink) stay opaque; near-white pixels become
+ * transparent, with a smooth falloff at the edges rather than a hard cutout. Any existing
+ * transparency (e.g. an already-transparent PNG) is preserved -- this only ever makes
+ * pixels *more* transparent, never less.
+ */
+export async function removeWhiteBackground(pngBuffer: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(pngBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const { width, height, channels } = info; // 4 after ensureAlpha (RGBA)
+  for (let i = 0; i < data.length; i += channels) {
+    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const backgroundAlpha = Math.max(0, Math.min(255, Math.round(255 - luminance)));
+    data[i + 3] = Math.min(data[i + 3], backgroundAlpha);
+  }
+
+  return sharp(data, { raw: { width, height, channels } }).png().toBuffer();
+}
+
 export interface SignatureStatus {
   hasSignature: boolean;
   signaturePath: string | null;
@@ -111,6 +135,21 @@ export async function enrollSignature(formData: FormData) {
       detectedMime = 'image/png';
     } else {
       throw new Error('Invalid format: Signature must be a PNG, JPEG, WebP, or SVG image.');
+    }
+  }
+
+  // Background removal requires an alpha channel, which JPEG can't carry -- upgrade a JPEG
+  // upload to PNG first when the user asked for it. Only file uploads carry this flag;
+  // canvas-drawn signatures are already transparent and never send it.
+  const removeBackground = formData.get('remove_background') === 'true';
+  if (removeBackground) {
+    if (detectedMime === 'image/jpeg') {
+      fileBuffer = await sharp(fileBuffer).png().toBuffer();
+      detectedMime = 'image/png';
+    }
+    fileBuffer = await removeWhiteBackground(fileBuffer);
+    if (fileBuffer.length > MAX_SIGNATURE_SIZE_BYTES) {
+      throw new Error('Signature image exceeds the 2 MB limit after background removal.');
     }
   }
 

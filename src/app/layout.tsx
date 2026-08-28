@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
 export const metadata: Metadata = {
   title: "InternDocs — Makerspace",
@@ -12,7 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       {/* suppressHydrationWarning here only silences mismatches on <body> itself (non-recursive) --
           this is the standard guard against browser extensions (ad blockers, password managers,
           antivirus) that inject attributes like bis_skin_checked before React hydrates. */}
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>{children}</body>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <RefreshOnFocus />
+        {children}
+      </body>
     </html>
   );
 }

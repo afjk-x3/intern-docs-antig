@@ -1,6 +1,7 @@
 import { getInternChecklist, uploadSubmission, resubmitSubmission, getSubmissionSignedDownloadUrl } from '@lib/data/submissions';
 import { createClient } from '@lib/supabase/server';
 import { InternChecklist } from '@/components/InternChecklist';
+import { AutoRefresh } from '@/components/AutoRefresh';
 import { redirect } from 'next/navigation';
 
 export default async function InternDashboard() {
@@ -47,12 +48,18 @@ export default async function InternDashboard() {
   }
 
   return (
-    <InternChecklist
-      items={items}
-      internEmail={user.email}
-      onUploadAction={handleUpload}
-      onResubmitAction={handleResubmit}
-      onGetDownloadUrlAction={handleGetDownloadUrl}
-    />
+    <>
+      {/* Background auto-refresh so interns see status updates automatically -- re-runs this
+          page's Server Components every 60s via router.refresh(), no client-side querying.
+          Longer interval than the approver/admin views since this page is lower urgency. */}
+      <AutoRefresh intervalMs={60_000} />
+      <InternChecklist
+        items={items}
+        internEmail={user.email}
+        onUploadAction={handleUpload}
+        onResubmitAction={handleResubmit}
+        onGetDownloadUrlAction={handleGetDownloadUrl}
+      />
+    </>
   );
 }

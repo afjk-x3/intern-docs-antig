@@ -9,6 +9,7 @@ import { hasEnrolledSignature, getOwnSignaturePreviewUrl } from '@lib/data/signa
 import { getApproversList } from '@lib/data/routing';
 import { createClient } from '@lib/supabase/server';
 import { ApproverQueue } from '@/components/ApproverQueue';
+import { AutoRefresh } from '@/components/AutoRefresh';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
@@ -77,6 +78,9 @@ export default async function ApproverDashboard() {
 
   return (
     <div className="p-6 md:p-10 space-y-6">
+      {/* Background auto-refresh so supervisors see incoming documents promptly -- re-runs
+          this page's Server Components every 15s via router.refresh(), no client-side querying. */}
+      <AutoRefresh intervalMs={15_000} />
       {/* Missing Signature Alert Banner */}
       {!hasSignature && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">

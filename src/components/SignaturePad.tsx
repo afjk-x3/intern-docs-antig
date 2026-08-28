@@ -21,6 +21,7 @@ export function SignaturePad({
   const [mode, setMode] = useState<'canvas' | 'upload'>('canvas');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [removeBackground, setRemoveBackground] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -36,13 +37,55 @@ export function SignaturePad({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPreviewUrl]);
 
-  // Revoke the dropzone's own immediate preview (shown as soon as a file is picked, before
-  // the user clicks "Update Signature") whenever it's replaced or the component unmounts.
+  // Computes the dropzone's immediate preview (shown as soon as a file is picked, before the
+  // user clicks "Update Signature") -- including a live preview of background removal, using
+  // the same luminance-to-alpha rule as the server (lib/data/signatures.ts:removeWhiteBackground),
+  // so what's shown here is what actually gets saved.
   useEffect(() => {
-    return () => {
-      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+    if (!uploadFile) return; // uploadPreviewUrl is cleared wherever uploadFile is nulled
+
+    let cancelled = false;
+    const objectUrl = URL.createObjectURL(uploadFile);
+
+    // Always resolve the preview through the Image element's async load callback (even when
+    // background removal is off) so every setUploadPreviewUrl call here happens in response to
+    // that external event, not synchronously in the effect body.
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      if (!removeBackground) {
+        setUploadPreviewUrl(objectUrl);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx || canvas.width === 0 || canvas.height === 0) {
+        setUploadPreviewUrl(objectUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const luminance = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const backgroundAlpha = Math.max(0, Math.min(255, Math.round(255 - luminance)));
+        d[i + 3] = Math.min(d[i + 3], backgroundAlpha);
+      }
+      ctx.putImageData(imageData, 0, 0);
+      setUploadPreviewUrl(canvas.toDataURL('image/png'));
     };
-  }, [uploadPreviewUrl]);
+    img.onerror = () => {
+      if (!cancelled) setUploadPreviewUrl(objectUrl);
+    };
+    img.src = objectUrl;
+
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [uploadFile, removeBackground]);
 
   // Canvas drawing setup
   useEffect(() => {
@@ -132,7 +175,6 @@ export function SignaturePad({
         return;
       }
       setUploadFile(file);
-      setUploadPreviewUrl(URL.createObjectURL(file));
       setErrorMsg(null);
     }
   };
@@ -156,7 +198,10 @@ export function SignaturePad({
         setErrorMsg('Please choose a PNG, JPG, WebP, or SVG signature file to upload.');
         return;
       }
-      setPendingPreviewUrl(URL.createObjectURL(uploadFile));
+      // Reuse the dropzone's own preview (already reflects background removal, if enabled)
+      // instead of building a fresh one from the raw file, so the confirm dialog matches
+      // exactly what's about to be saved.
+      setPendingPreviewUrl(uploadPreviewUrl);
     }
 
     setConfirmError(null);
@@ -173,6 +218,7 @@ export function SignaturePad({
     } else {
       if (!uploadFile) return;
       formData.set('file', uploadFile);
+      formData.set('remove_background', String(removeBackground));
     }
 
     setIsSaving(true);
@@ -347,6 +393,21 @@ export function SignaturePad({
                   )}
                 </label>
               </div>
+
+              <label className="flex items-start gap-2 mt-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={removeBackground}
+                  onChange={(e) => setRemoveBackground(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 rounded border-border-default text-brand-primary focus:ring-brand-primary"
+                />
+                <span className="text-[11px] text-text-muted leading-snug">
+                  <span className="font-semibold text-text-primary">Automatically remove background.</span>{' '}
+                  Best for a photo or scan of your signature on plain white or light paper. Turn this off if your
+                  image already has a transparent background, or if the background isn&apos;t plain white/light
+                  (the preview above shows exactly what will be saved either way).
+                </span>
+              </label>
             </div>
           )}
 

@@ -3,6 +3,67 @@
 Running log of decisions made after the Week 8 handover (see `08-implementation-plan.md`),
 for whoever picks this up next. Newest entries first.
 
+## 2026-08-28 — Hybrid data freshness (background auto-refresh + refresh-on-focus)
+
+Added two reusable client components -- `AutoRefresh` and `RefreshOnFocus`
+(`src/components/`) -- that call only `router.refresh()`. No client-side Supabase
+queries or Realtime subscriptions anywhere in this: `router.refresh()` re-runs the
+current route's Server Components against the database (through the same RLS-scoped
+server-side data functions the initial render used) and merges the result into the
+existing React tree without a full page reload or loss of client component state (open
+modals, in-progress form input, etc. survive a refresh).
+
+- **Background auto-refresh** (interval-based polling): approver queue (`/approver`)
+  every 15s, admin completion dashboard (`/admin/dashboard`) every 30s, intern checklist
+  (`/intern`) every 60s -- shortest interval where staleness is costliest (an approver
+  not seeing a new submission), longest where it's least (an intern's own status view).
+  Pauses while the tab is hidden (`visibilitychange`) so a backgrounded tab doesn't keep
+  polling the server; resumes when it's visible again.
+- **Refresh on window focus** (global): `RefreshOnFocus` is mounted once in the root
+  `layout.tsx`, so every route gets it automatically without opting in -- covers Audit
+  Log, Requirement Setup, Signature Settings, User Management, everything. Listens to
+  both `focus` and `visibilitychange`, since browsers don't reliably fire `focus` for
+  switching back to a tab within the same window; `visibilitychange` catches that case.
+
+Not addressed, deliberately out of scope for this pass: nothing coordinates the two
+mechanisms against each other (a page with both can fire two `router.refresh()` calls
+in quick succession right after regaining focus -- harmless, just a little redundant),
+and there's no per-user or per-page way to disable polling if it turns out 15s on the
+approver queue is too chatty at pilot scale. Revisit once there are real usage numbers,
+per the caching/performance phase already flagged as coming next.
+
+## 2026-08-28 — Signature background removal
+
+Added a "remove background" option to signature upload (not canvas drawing, which is
+already transparent). Deliberately **not** an ML-based background remover (e.g. remove.bg):
+a signature is a bounded, well-defined case (dark ink on light paper), and a general
+subject-segmentation service would mean sending signature images -- personal data under
+RA 10173 -- to a third party, plus a heavy model dependency that doesn't fit Vercel's
+serverless functions well.
+
+Instead, `removeWhiteBackground` in `lib/data/signatures.ts` does a deterministic,
+local, per-pixel luminance-to-alpha mapping via `sharp`: near-white pixels become
+transparent, dark pixels (ink) stay opaque, with a smooth falloff at the edges rather
+than a hard cutout. It only ever makes a pixel *more* transparent than it already was
+(`Math.min(existingAlpha, luminanceDerivedAlpha)`), so it's safe to run on an
+already-transparent PNG without undoing that transparency. Known limitation, surfaced in
+the UI copy rather than hidden: it won't do anything sensible on a signature photographed
+against a patterned or dark surface -- that's out of scope for this approach by design.
+
+Wired in as an opt-in checkbox (default on) in `SignaturePad.tsx`, sent as a
+`remove_background` form field only from the upload path (never from canvas). Because
+removal needs an alpha channel, a JPEG upload that requests it gets promoted to PNG
+first -- a side effect worth knowing about: this is *also* now the fix for JPEG's
+previously-documented "stamps with an opaque background" limitation, whenever the user
+opts in.
+
+The client mirrors the exact same formula in `SignaturePad.tsx` via a `<canvas>`
+pixel loop, purely so the dropzone preview (and the confirm-dialog preview, which now
+reuses it instead of building a separate one) shows the *actual* result before saving --
+it is not a security or correctness boundary; the server-side `sharp` pass is what
+actually gets persisted regardless of what the client computed. Covered by
+`__tests__/signature-background-removal.test.ts`.
+
 ## 2026-08-28 — HR bug reports + intern grouping feature
 
 ### Bug: intern document upload failing with "new row violates row-level security policy"
