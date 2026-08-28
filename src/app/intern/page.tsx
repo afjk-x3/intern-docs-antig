@@ -1,4 +1,5 @@
 import { getInternChecklist, uploadSubmission, resubmitSubmission, getSubmissionSignedDownloadUrl } from '@lib/data/submissions';
+import { getRequirementTemplateDownloadUrl } from '@lib/data/requirements';
 import { createClient } from '@lib/supabase/server';
 import { InternChecklist } from '@/components/InternChecklist';
 import { AutoRefresh } from '@/components/AutoRefresh';
@@ -47,6 +48,17 @@ export default async function InternDashboard() {
     }
   }
 
+  async function handleGetTemplateUrl(requirementId: string) {
+    'use server';
+    try {
+      const res = await getRequirementTemplateDownloadUrl(requirementId);
+      return { signedUrl: res.signedUrl };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch template download link';
+      return { error: msg };
+    }
+  }
+
   return (
     <>
       {/* Background auto-refresh so interns see status updates automatically -- re-runs this
@@ -59,6 +71,7 @@ export default async function InternDashboard() {
         onUploadAction={handleUpload}
         onResubmitAction={handleResubmit}
         onGetDownloadUrlAction={handleGetDownloadUrl}
+        onGetTemplateUrlAction={handleGetTemplateUrl}
       />
     </>
   );

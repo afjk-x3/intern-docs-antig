@@ -21,7 +21,7 @@ export interface ApproverQueueItem {
   updated_at: string;
   isOverdue: boolean;
   waitingHours: number;
-  users?: { id: string; email: string; school?: string | null; batch?: string | null };
+  users?: { id: string; email: string; full_name?: string | null; school?: string | null; batch?: string | null };
   requirements?: RequirementRecord | null;
   routing_snapshot?: { sla_days?: number } | null;
   activeVersion: SubmissionVersionRecord | null;
@@ -323,7 +323,7 @@ export function ApproverQueue({
                   return (
                     <tr key={sub.id} className="hover:bg-surface-hover transition-colors align-top">
                       <td className="px-6 py-4 font-medium text-text-primary align-top">
-                        {sub.users?.email || 'Unknown'}
+                        {sub.users?.full_name || sub.users?.email || 'Unknown'}
                         {(sub.users?.school || sub.users?.batch) && (
                           <div className="text-[10px] font-normal text-text-muted">
                             {[sub.users?.school, sub.users?.batch].filter(Boolean).join(' · ')}
@@ -432,7 +432,7 @@ export function ApproverQueue({
             <>
               <p className="text-xs text-text-muted -mt-2">
                 Applying your digital signature stamp to{' '}
-                <strong className="text-text-primary">{selectedSub.users?.email}</strong>&apos;s submission.
+                <strong className="text-text-primary">{selectedSub.users?.full_name || selectedSub.users?.email}</strong>&apos;s submission.
               </p>
 
               <div className="p-3 bg-surface-muted rounded-xl text-xs space-y-1.5 text-text-muted border border-border-default">

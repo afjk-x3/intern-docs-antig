@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { createClient } from '../supabase/server';
 import { createAdminClient } from '../supabase/admin';
 import { detectMagicBytes } from './file-validation';
+import { trimSignatureWhitespace } from '../image/trim-signature';
 import { headers } from 'next/headers';
 
 const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -151,6 +152,15 @@ export async function enrollSignature(formData: FormData) {
     if (fileBuffer.length > MAX_SIGNATURE_SIZE_BYTES) {
       throw new Error('Signature image exceeds the 2 MB limit after background removal.');
     }
+  }
+
+  // Trim surrounding whitespace so the stored bounding box hugs the actual signature --
+  // see trimSignatureWhitespace's own comment. PNG only: a JPEG here has no alpha channel
+  // to trim by transparency, and re-trimming/re-encoding a photo risks visible artifacts
+  // for a purely cosmetic step; canvas-drawn signatures (the common case this fixes) are
+  // always PNG already.
+  if (detectedMime === 'image/png') {
+    fileBuffer = await trimSignatureWhitespace(fileBuffer);
   }
 
   const ext = detectedMime === 'image/jpeg' ? 'jpg' : 'png';

@@ -8,11 +8,14 @@ Built on Tailwind CSS + shadcn/ui. This file defines tokens and component rules.
 
 Contrast ratios verified against white (#FFFFFF): primary #1B3251 = 10.07:1, accent #C9400A = 4.88:1, both pass WCAG AA.
 
+**Found 2026-08-28, by the first Playwright/axe CI run (docs/09-project-audit.md):** those two ratios were each checked against white independently, but `--brand-accent` is also used as *text* directly on `--brand-primary` (the login page's dark hero panel, `Wordmark`'s "Docs" when `onDark`) — a combination nobody had checked. `#C9400A` on `#1B3251` is only 2.6:1, failing WCAG 1.4.3's 3:1 floor even for large bold text. Added `--brand-accent-on-dark: #FF8A50` (5.55:1 on `--brand-primary`) for exactly that combination; `--brand-accent` itself is unchanged and still correct against light backgrounds. Lesson for future tokens: verify every *pairing* a color is actually used in, not just against white.
+
 ```css
 :root {
   --brand-primary: #1B3251;
   --brand-primary-hover: #112136;
   --brand-accent: #C9400A;
+  --brand-accent-on-dark: #FF8A50; /* text-brand-accent's replacement wherever the background is --brand-primary */
   --brand-muted: #EEF2F6;        /* light primary tint — active nav/tab backgrounds */
 
   --status-not-started: #94A3B8;

@@ -1,5 +1,5 @@
 import { inviteUser } from '@lib/data/auth';
-import { updateUserRole, updateUserGroup, getInternGroupOptions } from '@lib/data/users';
+import { updateUserRole, updateUserGroup, updateInternshipDatesAsAdmin, getInternGroupOptions } from '@lib/data/users';
 import { AdminInviteForm } from '@/components/AdminInviteForm';
 import { UserManagementTable } from '@/components/UserManagementTable';
 import { createAdminClient } from '@lib/supabase/admin';
@@ -46,6 +46,20 @@ export default async function SystemAdminUsersPage() {
     await updateUserGroup(userId, school, batch);
   }
 
+  async function handleDatesChange(formData: FormData) {
+    'use server';
+    const userId = formData.get('userId') as string;
+    const start = formData.get('start') as string;
+    const end = formData.get('end') as string;
+    try {
+      await updateInternshipDatesAsAdmin(userId, start, end);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to update internship dates';
+      return { error: msg };
+    }
+  }
+
   const userList = users || [];
 
   return (
@@ -75,6 +89,7 @@ export default async function SystemAdminUsersPage() {
         users={userList}
         onRoleChangeAction={handleRoleChange}
         onGroupChangeAction={handleGroupChange}
+        onDatesChangeAction={handleDatesChange}
       />
     </div>
   );

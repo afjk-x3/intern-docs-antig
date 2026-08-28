@@ -4,6 +4,17 @@ import { createAdminClient } from '@lib/supabase/admin';
 import { getAdminDashboardData } from '@lib/data/dashboard';
 import { headers } from 'next/headers';
 
+// FR-21: one row per intern-requirement pair, in the columns the PRD specifies -- not
+// the wide per-requirement matrix the on-screen dashboard uses (FR-20 is a different,
+// deliberately different-shaped view of the same data).
+function toCsvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function toCsvDate(value: string | null | undefined): string {
+  return value ? new Date(value).toISOString().split('T')[0] : '';
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,53 +35,47 @@ export async function GET(request: Request) {
   // Fetch data
   const data = await getAdminDashboardData();
 
-  // Apply filters identically to client
-  const filteredInterns = data.interns.filter(intern => {
-    if (filterSchool !== 'ALL' && intern.school !== filterSchool) return false;
-    if (filterBatch !== 'ALL' && intern.batch !== filterBatch) return false;
-
-    if (filterReq === 'ALL' && filterState === 'ALL' && filterApprover === 'ALL') return true;
-
-    const internSubs = data.submissions.filter(s => s.intern_id === intern.id);
-
-    let matches = false;
-    if (internSubs.length === 0) {
-      if (filterState === 'NOT_STARTED' && filterApprover === 'ALL') matches = true;
-    } else {
-      matches = internSubs.some(sub => {
-        const matchReq = filterReq === 'ALL' || sub.requirement_id === filterReq;
-        const matchState = filterState === 'ALL' || sub.state === filterState;
-        const matchAppr = filterApprover === 'ALL' || sub.current_holder_email === filterApprover;
-        return matchReq && matchState && matchAppr;
-      });
-      if (!matches && filterState === 'NOT_STARTED') {
-         const hasSubForReq = internSubs.some(s => filterReq === 'ALL' ? false : s.requirement_id === filterReq);
-         if (!hasSubForReq && filterApprover === 'ALL') matches = true;
-      }
-    }
-    return matches;
-  });
-
-  const requirementsToRender = filterReq === 'ALL' 
-    ? data.requirements 
+  const requirementsToRender = filterReq === 'ALL'
+    ? data.requirements
     : data.requirements.filter(r => r.id === filterReq);
 
-  // Generate CSV string
-  let csv = 'Intern Email,School,Batch';
-  requirementsToRender.forEach(req => {
-    csv += `,${req.name.replace(/,/g, '')}`;
-  });
-  csv += '\n';
+  const header = [
+    'Intern Name', 'Intern Email', 'School', 'Batch',
+    'Requirement', 'State', 'Submitted Date', 'Approved Date', 'Approver', 'Current Holder',
+  ];
+  let csv = header.join(',') + '\n';
+  let resultCount = 0;
 
-  filteredInterns.forEach(intern => {
-    csv += `${intern.email},${(intern.school || '').replace(/,/g, '')},${(intern.batch || '').replace(/,/g, '')}`;
-    requirementsToRender.forEach(req => {
+  for (const intern of data.interns) {
+    if (filterSchool !== 'ALL' && intern.school !== filterSchool) continue;
+    if (filterBatch !== 'ALL' && intern.batch !== filterBatch) continue;
+
+    for (const req of requirementsToRender) {
       const sub = data.submissions.find(s => s.intern_id === intern.id && s.requirement_id === req.id);
       const state = sub ? sub.state : 'NOT_STARTED';
-      csv += `,${state}`;
-    });
-    csv += '\n';
-  });
+
+      if (filterState !== 'ALL') {
+        const matchesState = filterState === 'OVERDUE' ? (sub?.isOverdue ?? false) : state === filterState;
+        if (!matchesState) continue;
+      }
+      if (filterApprover !== 'ALL' && sub?.current_holder_email !== filterApprover) continue;
+
+      const row = [
+        intern.full_name || '',
+        intern.email,
+        intern.school || '',
+        intern.batch || '',
+        req.name,
+        state,
+        toCsvDate(sub?.submitted_at),
+        toCsvDate(sub?.approved_at),
+        sub?.approver_name || sub?.approver_email || '',
+        sub?.current_holder_name || sub?.current_holder_email || '',
+      ];
+      csv += row.map(toCsvField).join(',') + '\n';
+      resultCount++;
+    }
+  }
 
   // Audit log the export
   const adminClient = createAdminClient();
@@ -83,7 +88,7 @@ export async function GET(request: Request) {
     target_id: null,
     target_type: 'system',
     source_ip: ip,
-    payload: { filterReq, filterState, filterApprover, filterSchool, filterBatch, resultCount: filteredInterns.length }
+    payload: { filterReq, filterState, filterApprover, filterSchool, filterBatch, resultCount },
   });
 
   return new NextResponse(csv, {

@@ -4,6 +4,7 @@
   --brand-primary: #1B3251;      /* InternDocs primary — 10.07:1 on white */
   --brand-primary-hover: #112136;
   --brand-accent: #C9400A;       /* InternDocs accent — 4.88:1 on white */
+  --brand-accent-on-dark: #FF8A50; /* lighter tint — 5.55:1 on --brand-primary; --brand-accent itself is only 2.6:1 there, fails WCAG AA (found by the Playwright/axe CI scan) */
   --brand-muted: #EEF2F6;        /* light primary tint — active nav/tab backgrounds */
 
   --status-not-started: #94A3B8;
@@ -32,6 +33,7 @@
   --color-brand-primary: #1B3251;
   --color-brand-primary-hover: #112136;
   --color-brand-accent: #C9400A;
+  --color-brand-accent-on-dark: #FF8A50;
   --color-brand-muted: #EEF2F6;
 
   --color-status-not-started: #94A3B8;

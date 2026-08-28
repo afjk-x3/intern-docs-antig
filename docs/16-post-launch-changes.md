@@ -3,6 +3,100 @@
 Running log of decisions made after the Week 8 handover (see `08-implementation-plan.md`),
 for whoever picks this up next. Newest entries first.
 
+## 2026-08-28 — Printed name profile (replaces email on approved documents)
+
+FR-11's acceptance criteria (`docs/prd-intern-docflow.md`) requires the composited
+signature block on an approved document to show "the approver's printed name" alongside
+the signature image, step number, and date. Until now that slot was filled with
+`dbUser.email` -- no name concept existed anywhere in the schema, the invite flow, or
+`accept-invite`.
+
+Added `full_name TEXT` to `public.users`
+(`20240101000018_add_user_full_name.sql`, nullable -- no existing account has ever had a
+chance to set it) and a `ProfileForm` component wired into a "My Profile" page for every
+role (`/intern/profile`, `/approver/profile`, `/admin/profile`, `/system-admin/profile`,
+all backed by `getOwnProfile`/`updateOwnProfile` in `lib/data/users.ts`). No new RLS was
+needed -- "Users can update own row" (migration 0) already covers `full_name`, and the
+self-role-escalation trigger (migration 12) only guards the `role` column.
+
+Two enforcement points, deliberately mirroring how signature enrollment already works:
+
+- **New accounts**: `accept-invite` now collects Full Name alongside the password, so
+  it's set once at activation instead of nagging later.
+- **Existing accounts** (already activated before this shipped, so no name on file):
+  `approveSubmissionSigned` (`lib/data/submissions.ts`) now throws `Profile Incomplete`
+  if `full_name` is empty, using the exact same gate pattern as the pre-existing
+  `Signature Required` check right above it. Both the approver queue and the admin Final
+  Approval page show an amber banner + direct link the moment a signature *or* a name is
+  missing -- the goal was to never let someone hit the raw error message as their first
+  signal, same reasoning as the existing "Signature Required" banner on `/approver`.
+
+Compositing (`lib/data/submissions.ts`, both the current-step and prior-step signatory
+blocks) now reads `full_name` first and falls back to `email`, never a generic label, for
+anyone who approved a step before this feature existed. RoleSidebar's footer and the
+intern header now also show `full_name` in place of email wherever it's set, and the
+intern header text now links to `/intern/profile` -- a natural side benefit of building
+the profile page, even though FR-11 only requires the name on *approved documents*, not
+in the UI generally.
+
+Deliberately out of scope: every other place `email` is displayed instead of a name (the
+admin dashboard, approver queue's intern column, CSV export, System Admin's user table)
+still shows email -- FR-11 only asked for approver/admin identity on the signed PDF, and
+touching every user-facing email string in the app is a much larger, separate decision.
+
+## 2026-08-28 — Reverted an in-progress "profile / printed full name" feature
+
+A concurrent, unfinished pass (uncommitted, no doc entry of its own) had added a
+`full_name` column and profile pages (`/admin/profile`, `/approver/profile`,
+`/intern/profile`, `/system-admin/profile` + `ProfileForm.tsx`) so an approver's printed
+name -- not just their email -- shows on the composited signature block, and had wired it
+in as a hard gate: `approveSubmissionSigned` in `lib/data/submissions.ts` threw "Profile
+Incomplete" if `full_name` was unset, `accept-invite` collected it at account setup, and
+every role layout linked to a profile page and showed the name in the sidebar. Removed by
+request: the new migration (`20240101000018_add_user_full_name.sql`), all four profile
+pages, `ProfileForm.tsx`, and every reference to `full_name` / the approval-blocking guard
+across `lib/data/{submissions,users}.ts`, all four `layout.tsx` files, `accept-invite`,
+`admin/final-approval`, and `approver/page.tsx`. Confirmed via a read-only query that the
+`full_name` column was never applied to the live database, so there was no DB state to
+clean up. If printed names come back later, note the acceptance criteria this was solving
+for: FR-11 wants the signature block to show a name, not just an email.
+
+## 2026-08-28 — Retention & Deletions scoped to System Admin; two dead routing templates removed
+
+**Retention & Deletions** was reachable from both `/admin/retention` (cohort Admin
+Console) and `/system-admin/retention` (System Admin Console) -- the latter is the
+fuller of the two (purge audit log, manual sweep trigger, active/purged counts), the
+former a stripped-down read-only table. Deleted `/admin/retention` and its sidebar entry
+in `src/app/admin/layout.tsx` rather than adding a role gate in front of it, since
+keeping two views of the same RA 10173 retention data around was the actual problem, not
+just who could see it. A `system_admin` user reaches the full page via the existing
+"System Admin Console ↗" link in the cohort console's sidebar.
+
+**Routing templates**: removed "Two-Step Lead & Admin Review" (seeded id
+`00000000-0000-0000-0000-000000000002` in `20240101000002_...sql`) and "2-Step Approval"
+(created later through the admin UI, so no fixed id) via
+`20240101000017_remove_lead_admin_and_2step_approval_templates.sql`. One requirement
+("test2", a QA-only requirement with a single already-approved test submission) was
+still pointed at "2-Step Approval"; the migration reassigns it to `routing_template_id =
+NULL` rather than picking a replacement template on the admin's behalf -- null is an
+already-supported state (`lib/data/submissions.ts` falls back to a single default-approver
+step when a requirement has no routing template), and several other requirements already
+run that way. Deletions are logged to `audit_log` as `DELETE_ROUTING_TEMPLATE`. The
+migration matches by name as well as id, since "2-Step Approval" only ever existed as
+live data, never as a seeded row with a stable id.
+
+Left standing, on purpose: "Single Supervisor Review" and "2-Step Supervisor & Admin
+Review" (id `2296cf82-...`), which the admin confirmed should stay.
+
+Also removed the Admin Console's standalone "Signature Settings" page (`/admin/signature`)
+and its sidebar entry -- it was a second, identical way to do what the "My Signature"
+modal on `/admin/final-approval` (`AdminSignatureOverlay`) already does: both wrapped the
+exact same `SignaturePad` + `enrollSignature` call. Kept the modal, since it's contextual
+(shown right where signing happens) rather than a permanent nav item for something one
+click away. The approver role doesn't have this duplication -- its `/approver/signature`
+page is the *only* place to enroll a signature, linked from a banner on the queue -- so
+this was specifically an admin-side redundancy, not an app-wide pattern.
+
 ## 2026-08-28 — Hybrid data freshness (background auto-refresh + refresh-on-focus)
 
 Added two reusable client components -- `AutoRefresh` and `RefreshOnFocus`

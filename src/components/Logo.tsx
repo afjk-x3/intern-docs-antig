@@ -32,7 +32,7 @@ export function Wordmark({ className = '', onDark = false }: { className?: strin
   return (
     <span className={`font-extrabold tracking-tight leading-none ${className}`}>
       <span className={onDark ? 'text-white' : 'text-brand-primary'}>Intern</span>
-      <span className="text-brand-accent">Docs</span>
+      <span className={onDark ? 'text-brand-accent-on-dark' : 'text-brand-accent'}>Docs</span>
     </span>
   );
 }

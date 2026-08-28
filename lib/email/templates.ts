@@ -45,4 +45,15 @@ export const emailTemplates = {
     <p>A submission for <strong>${reqName}</strong> by ${internEmail} has been pending approval for more than 5 working days.</p>
     <p>Please log in to the InternDocs admin portal to follow up or reassign.</p>
   `,
+
+  submissionCancelled: (reqName: string, reason: string) => `
+    <p>Your submission for <strong>${reqName}</strong> has been cancelled by an administrator.</p>
+    <p>Reason: <em>${reason}</em></p>
+    <p>Log in to the InternDocs portal if you have questions.</p>
+  `,
+
+  submissionReopened: (reqName: string) => `
+    <p>Your submission for <strong>${reqName}</strong>, previously expired, has been reopened by an administrator and is back under review.</p>
+    <p>Log in to the InternDocs portal to check its status.</p>
+  `,
 };

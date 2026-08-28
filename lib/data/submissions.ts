@@ -70,6 +70,7 @@ export interface RequirementRecord {
   due_date_value: string;
   routing_template_id?: string | null;
   version_number?: number;
+  template_url?: string | null;
   signature_config?: {
     page?: 'first' | 'last' | number;
     x?: number;
@@ -105,7 +106,7 @@ export interface ApprovalRecord {
   file_hash: string;
   signed_pdf_url?: string | null;
   created_at: string;
-  users?: { email?: string } | null;
+  users?: { email?: string; full_name?: string | null } | null;
 }
 
 export interface SubmissionWithRelations {
@@ -119,7 +120,9 @@ export interface SubmissionWithRelations {
   created_at: string;
   updated_at: string;
   routing_snapshot?: { steps?: Array<{ step: number; role?: string; user_id?: string; name?: string }>; sla_days?: number; name?: string } | null;
-  users?: { id: string; email: string; school?: string | null; batch?: string | null };
+  users?: { id: string; email: string; full_name?: string | null; school?: string | null; batch?: string | null };
+  /** Current step holder (FR-5: shown to the intern while a submission is In Review). */
+  current_holder?: { id: string; email: string; full_name?: string | null } | null;
   requirements?: RequirementRecord | null;
   submission_versions?: SubmissionVersionRecord[];
   approvals?: ApprovalRecord[];
@@ -187,7 +190,8 @@ export async function getInternChecklist() {
       created_at,
       updated_at,
       submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at),
-      approvals(id, step, approver_id, file_hash, signed_pdf_url, created_at, users(id, email, role))
+      approvals(id, step, approver_id, file_hash, signed_pdf_url, created_at, users(id, email, full_name, role)),
+      current_holder:users!submissions_current_holder_id_fkey(id, email, full_name)
     `)
     .eq('intern_id', user.id);
 
@@ -255,6 +259,10 @@ export async function getInternChecklist() {
       versions,
       deletionDate: deletionDate ? deletionDate.toISOString() : null,
       deletionDaysRemaining,
+      // FR-5: shown next to the status badge only while a submission is In Review.
+      currentHolderName: effectiveState === 'IN_REVIEW'
+        ? (sub?.current_holder?.full_name || sub?.current_holder?.email || null)
+        : null,
     };
   });
 
@@ -293,7 +301,7 @@ export async function getApproverQueue() {
       created_at,
       updated_at,
       routing_snapshot,
-      users!submissions_intern_id_fkey(id, email, school, batch),
+      users!submissions_intern_id_fkey(id, email, full_name, school, batch),
       requirements(id, name, max_size_mb, accepted_types, signature_config, routing_templates(*)),
       submission_versions(id, version_number, file_url, file_hash, return_comment, is_superseded, created_at),
       approvals(id, step, approver_id, created_at)
@@ -761,7 +769,7 @@ export async function approveSubmissionSigned(submissionId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error('Not authenticated');
 
-  const { data: dbUser } = await supabase.from('users').select('role, email, signature_path').eq('id', user.id).single();
+  const { data: dbUser } = await supabase.from('users').select('role, email, full_name, signature_path').eq('id', user.id).single();
   const role = dbUser?.role as UserRole;
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(role)) {
@@ -845,7 +853,7 @@ export async function approveSubmissionSigned(submissionId: string) {
       const prevSig = await getSignatureBytesForCompositing(prevAppr.approver_id);
       const { data: prevUserData } = await adminClient
         .from('users')
-        .select('email, role')
+        .select('email, role, full_name')
         .eq('id', prevAppr.approver_id)
         .single();
 
@@ -854,7 +862,7 @@ export async function approveSubmissionSigned(submissionId: string) {
         roleTitle: prevAppr.step === 1 ? 'Supervisor Review:' : `Step ${prevAppr.step} Review:`,
         signaturePngBuffer: prevSig.buffer,
         signatureMimeType: prevSig.mimeType,
-        approverName: prevUserData?.email || 'Supervisor',
+        approverName: prevUserData?.full_name || prevUserData?.email || 'Supervisor',
         approvalDate: new Date(prevAppr.created_at),
       });
     } catch (err) {
@@ -869,7 +877,7 @@ export async function approveSubmissionSigned(submissionId: string) {
     roleTitle: isFinalStep && steps.length > 1 ? 'Final Admin Approval:' : (currentStep === 1 && steps.length > 1 ? 'Supervisor Review:' : 'Digitally Approved by:'),
     signaturePngBuffer: currentSig.buffer,
     signatureMimeType: currentSig.mimeType,
-    approverName: dbUser.email || 'Authorized Signatory',
+    approverName: dbUser.full_name || dbUser.email || 'Authorized Signatory',
     approvalDate: approvalDate,
   });
 
@@ -1045,6 +1053,123 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
   const { data: newApprover } = await adminClient.from('users').select('email').eq('id', newApproverId).single();
   if (newApprover) {
     await sendEmailWithRetry(newApprover.email, `Reassigned: ${typedSub.requirements?.name}`, emailTemplates.stepReassigned(typedSub.requirements?.name || 'Document', parsedReason));
+  }
+
+  return { success: true };
+}
+
+const cancelReasonSchema = z.string().min(10, 'Cancellation reason must be at least 10 characters.');
+
+/**
+ * Appendix A: DRAFT/RETURNED -> CANCELLED, Administrator-only. Defined in the state
+ * machine since the migration that introduced it, but had no caller anywhere until now
+ * (docs/09-project-audit.md, 2026-08-28 audit, gap #21).
+ */
+export async function cancelSubmission(submissionId: string, reason: string) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const role = dbUser?.role as UserRole;
+  if (!dbUser || !['admin', 'system_admin'].includes(role)) {
+    throw new Error('Unauthorized: Only administrators can cancel a submission.');
+  }
+
+  const parsedReason = cancelReasonSchema.parse(reason);
+
+  const { data: submission, error: subErr } = await supabase
+    .from('submissions')
+    .select('*, users!submissions_intern_id_fkey(email), requirements(name)')
+    .eq('id', submissionId)
+    .single();
+
+  if (subErr || !submission) throw new Error('Submission not found');
+
+  const typedSub = submission as unknown as SubmissionWithRelations;
+  const adminClient = createAdminClient();
+  await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, 'CANCEL', role);
+
+  await adminClient
+    .from('submissions')
+    .update({ state: SubmissionState.CANCELLED, updated_at: new Date().toISOString() })
+    .eq('id', submissionId);
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'CANCEL_SUBMISSION',
+    target_id: submissionId,
+    target_type: 'submissions',
+    source_ip: ip,
+    payload: { reason: parsedReason },
+  });
+
+  const internEmail = typedSub.users?.email;
+  if (internEmail) {
+    await sendEmailWithRetry(
+      internEmail,
+      `Submission Cancelled: ${typedSub.requirements?.name || 'Document'}`,
+      emailTemplates.submissionCancelled(typedSub.requirements?.name || 'Document', parsedReason)
+    );
+  }
+
+  return { success: true };
+}
+
+/**
+ * Appendix A: EXPIRED -> IN_REVIEW ("Admin may reopen"), Administrator-only. See the
+ * REOPEN rule comment in lib/state-machine/index.ts for why the target state is
+ * IN_REVIEW rather than something state-specific.
+ */
+export async function reopenSubmission(submissionId: string) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const role = dbUser?.role as UserRole;
+  if (!dbUser || !['admin', 'system_admin'].includes(role)) {
+    throw new Error('Unauthorized: Only administrators can reopen a submission.');
+  }
+
+  const { data: submission, error: subErr } = await supabase
+    .from('submissions')
+    .select('*, users!submissions_intern_id_fkey(email), requirements(name)')
+    .eq('id', submissionId)
+    .single();
+
+  if (subErr || !submission) throw new Error('Submission not found');
+
+  const typedSub = submission as unknown as SubmissionWithRelations;
+  const adminClient = createAdminClient();
+  await validateTransitionAudited(adminClient, user.id, typedSub.id, typedSub.state, 'REOPEN', role);
+
+  await adminClient
+    .from('submissions')
+    .update({ state: SubmissionState.IN_REVIEW, updated_at: new Date().toISOString() })
+    .eq('id', submissionId);
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'REOPEN_SUBMISSION',
+    target_id: submissionId,
+    target_type: 'submissions',
+    source_ip: ip,
+  });
+
+  const internEmail = typedSub.users?.email;
+  if (internEmail) {
+    await sendEmailWithRetry(
+      internEmail,
+      `Submission Reopened: ${typedSub.requirements?.name || 'Document'}`,
+      emailTemplates.submissionReopened(typedSub.requirements?.name || 'Document')
+    );
   }
 
   return { success: true };

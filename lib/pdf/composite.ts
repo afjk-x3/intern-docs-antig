@@ -1,6 +1,7 @@
 import 'server-only';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import crypto from 'crypto';
+import { trimSignatureWhitespace } from '../image/trim-signature';
 
 export interface SignatureConfig {
   page?: 'first' | 'last' | number;
@@ -116,9 +117,15 @@ export async function compositeSignedPdf({
 
   for (let i = 0; i < totalSigs; i++) {
     const sig = allSignatories[i];
+    // Fallback trim for signatures enrolled before lib/data/signatures.ts started
+    // trimming at enrollment time -- see trim-signature.ts's own comment. PNG only,
+    // same reasoning as enrollment: JPEG has no alpha channel to trim by.
+    const signatureBytes = sig.signatureMimeType === 'image/jpeg'
+      ? sig.signaturePngBuffer
+      : await trimSignatureWhitespace(sig.signaturePngBuffer);
     const signatureImage = sig.signatureMimeType === 'image/jpeg'
-      ? await pdfDoc.embedJpg(sig.signaturePngBuffer)
-      : await pdfDoc.embedPng(sig.signaturePngBuffer);
+      ? await pdfDoc.embedJpg(signatureBytes)
+      : await pdfDoc.embedPng(signatureBytes);
     const sigWidth = config.width || (totalSigs > 1 ? 120 : 140);
     const sigHeight = config.height || (signatureImage.height * (sigWidth / signatureImage.width));
 
@@ -153,26 +160,28 @@ export async function compositeSignedPdf({
         ? `Step ${sig.stepNumber || i + 1} (${i === 0 ? 'Supervisor' : 'Final Admin'}):`
         : `Digitally Approved by:`);
 
-    // Draw attestation metadata text below signature
-    targetPage.drawText(title, {
-      x: sigX,
-      y: Math.max(10, sigY - 10),
-      size: fontSize - 1,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
+    // Draw attestation metadata below the signature -- printed name directly under the
+    // signature image (a signature is conventionally given *over* a printed name, like a
+    // signature line), then the role title and date beneath that.
     targetPage.drawText(sig.approverName, {
       x: sigX,
-      y: Math.max(10, sigY - 20),
+      y: Math.max(10, sigY - 10),
       size: fontSize,
       font: boldFont,
       color: rgb(0.1, 0.2, 0.3),
     });
 
+    targetPage.drawText(title, {
+      x: sigX,
+      y: Math.max(10, sigY - 19),
+      size: fontSize - 1,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+
     targetPage.drawText(`Date: ${dateStr}`, {
       x: sigX,
-      y: Math.max(10, sigY - 29),
+      y: Math.max(10, sigY - 28),
       size: fontSize - 1,
       font,
       color: rgb(0.3, 0.3, 0.3),
