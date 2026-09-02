@@ -7,3 +7,4 @@ export * from './routing';
 export * from './submissions';
 export * from './file-validation';
 export * from './signatures';
+export * from './audit';

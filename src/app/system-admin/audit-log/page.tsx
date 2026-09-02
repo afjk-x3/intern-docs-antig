@@ -1,33 +1,28 @@
-import { AuditLogTable, AuditLogEntry } from '@/components/AuditLogTable';
-import { createAdminClient } from '@lib/supabase/admin';
+import { AuditLogTable } from '@/components/AuditLogTable';
+import { getAuditLogs, AuditLogEntry } from '@lib/data/audit';
+import { getSubmissionSignedDownloadUrl } from '@lib/data/submissions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SystemAdminAuditLogPage() {
-  const adminClient = createAdminClient();
-  
-  // Fetch initial data server-side
-  const { data, error } = await adminClient
-    .from('audit_log')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(150);
-    
   let initialLogs: AuditLogEntry[] = [];
+  let errorMsg: string | null = null;
 
-  if (!error && data) {
-    const actorIds = [...new Set(data.map(e => e.actor_id).filter(Boolean))];
-    const { data: usersData } = await adminClient
-      .from('users')
-      .select('id, email')
-      .in('id', actorIds);
+  try {
+    initialLogs = await getAuditLogs({ limit: 150 });
+  } catch (err: unknown) {
+    errorMsg = err instanceof Error ? err.message : 'Failed to load audit logs';
+  }
 
-    const usersMap = new Map((usersData || []).map(u => [u.id, u]));
-    
-    initialLogs = JSON.parse(JSON.stringify(data.map(e => ({
-      ...e,
-      users: e.actor_id ? usersMap.get(e.actor_id) || null : null
-    }))));
+  async function handleGetDownloadUrl(submissionId: string) {
+    'use server';
+    try {
+      const res = await getSubmissionSignedDownloadUrl(submissionId);
+      return { signedUrl: res.signedUrl, isVerified: res.isVerified, fileHash: res.fileHash };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to generate file download link';
+      return { error: msg };
+    }
   }
 
   return (
@@ -38,13 +33,16 @@ export default async function SystemAdminAuditLogPage() {
           Append-only, immutable record of all authentication, state transition, and administrative events.
         </p>
       </div>
-      
-      {error ? (
+
+      {errorMsg ? (
         <div className="rounded-xl bg-rose-50 p-6 text-sm text-rose-800 border border-rose-200">
-          Failed to load audit logs: {error.message}
+          Failed to load audit logs: {errorMsg}
         </div>
       ) : (
-        <AuditLogTable initialLogs={initialLogs} />
+        <AuditLogTable
+          initialLogs={initialLogs}
+          onGetDownloadUrlAction={handleGetDownloadUrl}
+        />
       )}
     </div>
   );

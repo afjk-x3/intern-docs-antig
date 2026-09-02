@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogoMark, Wordmark } from './Logo';
 import { Button } from './ui/button';
+import { SignOutButton } from './SignOutButton';
 
 interface NavItem {
   label: string;
@@ -101,11 +102,7 @@ export function RoleSidebar({ roleTitle, userName, navItems, children }: RoleSid
           <p className="text-sm font-semibold text-text-primary truncate mb-3" title={userName}>
             {userName}
           </p>
-          <form action="/auth/signout" method="post">
-            <Button type="submit" variant="outline" size="sm" className="w-full justify-start">
-              Sign out
-            </Button>
-          </form>
+          <SignOutButton className="w-full justify-start" />
         </div>
       </aside>
 

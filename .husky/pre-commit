@@ -1,10 +1,4 @@
-#!/bin/sh
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 if [ -n "$staged" ]; then
-  if command -v npx.cmd >/dev/null 2>&1; then
-    NPX="npx.cmd"
-  else
-    NPX="npx"
-  fi
-  echo "$staged" | xargs $NPX secretlint --maskSecrets
+  node ./node_modules/secretlint/bin/secretlint.js --maskSecrets $staged
 fi

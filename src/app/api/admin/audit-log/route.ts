@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@lib/supabase/server';
 import { createAdminClient } from '@lib/supabase/admin';
+import { enrichAuditLogs } from '@lib/data/audit';
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -37,17 +38,7 @@ export async function GET(request: Request) {
     return new NextResponse(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  const actorIds = [...new Set(data.map(e => e.actor_id).filter(Boolean))];
-  const { data: usersData } = await adminClient
-    .from('users')
-    .select('id, email')
-    .in('id', actorIds);
+  const dataWithEnrichment = await enrichAuditLogs(adminClient, data || []);
 
-  const usersMap = new Map((usersData || []).map(u => [u.id, u]));
-  const dataWithUsers = data.map(e => ({
-    ...e,
-    users: e.actor_id ? usersMap.get(e.actor_id) || null : null
-  }));
-
-  return NextResponse.json(dataWithUsers);
+  return NextResponse.json(dataWithEnrichment);
 }

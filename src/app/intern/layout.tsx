@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@lib/supabase/server';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
+import { SignOutButton } from '@/components/SignOutButton';
 
 export default async function InternLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -56,11 +57,7 @@ export default async function InternLayout({ children }: { children: React.React
               </p>
             )}
           </div>
-          <form action="/auth/signout" method="post">
-            <Button type="submit" variant="outline" size="sm">
-              Sign out
-            </Button>
-          </form>
+          <SignOutButton />
         </div>
       </header>
 
