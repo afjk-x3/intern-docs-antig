@@ -2,13 +2,17 @@ import {
   getApproverQueue,
   approveSubmissionSigned,
   returnSubmission,
+  reassignApprover,
   getSubmissionSignedDownloadUrl,
 } from '@lib/data/submissions';
 import { hasEnrolledSignature, getOwnSignaturePreviewUrl, enrollSignature } from '@lib/data/signatures';
+import { getApproversList } from '@lib/data/routing';
 import { createClient } from '@lib/supabase/server';
-import { ApproverQueue } from '@/components/ApproverQueue';
+import { AdminApprovalQueueView } from '@/components/AdminApprovalQueueView';
 import { AdminSignatureOverlay } from '@/components/AdminSignatureOverlay';
 import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default async function AdminFinalApprovalPage() {
   const supabase = await createClient();
@@ -28,17 +32,12 @@ export default async function AdminFinalApprovalPage() {
     redirect('/login');
   }
 
-  const [allItems, hasSignature, signaturePreview] = await Promise.all([
+  const [allItems, hasSignature, signaturePreview, approversList] = await Promise.all([
     getApproverQueue(),
     hasEnrolledSignature(user.id),
     getOwnSignaturePreviewUrl(),
+    getApproversList(),
   ]);
-
-  // Filter to only show items at Step 2 (Admin Final Approval) in a 2-way routing template
-  const step2Items = allItems.filter(
-    (item: { totalSteps?: number; currentStep?: number; stepRole?: string }) =>
-      item.totalSteps && item.totalSteps >= 2 && item.currentStep === 2 && item.stepRole === 'admin'
-  );
 
   async function handleApprove(submissionId: string) {
     'use server';
@@ -62,9 +61,15 @@ export default async function AdminFinalApprovalPage() {
     }
   }
 
-  async function handleReassign() {
+  async function handleReassign(submissionId: string, newApproverId: string, reason: string) {
     'use server';
-    return { error: 'Reassignment is not available for final admin approval step.' };
+    try {
+      await reassignApprover(submissionId, newApproverId, reason);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Reassignment failed';
+      return { error: msg };
+    }
   }
 
   async function handleGetDownloadUrl(submissionId: string) {
@@ -94,9 +99,9 @@ export default async function AdminFinalApprovalPage() {
       {/* Page Header with Top-Right Signature Overlay Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Final Approval Queue</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Approval Queue</h1>
           <p className="text-sm text-text-muted mt-1">
-            Documents awaiting your final sign-off (Step 2 of 2-way approval). These have already been reviewed and approved by a supervisor.
+            Review and sign Step 2 final approvals, or approve Step 1 submissions on behalf of unavailable supervisors.
           </p>
         </div>
 
@@ -111,31 +116,18 @@ export default async function AdminFinalApprovalPage() {
         </div>
       </div>
 
-      {/* Approval Queue Table */}
-      {step2Items.length === 0 ? (
-        <div className="bg-surface-bg border border-border-default rounded-xl p-10 text-center">
-          <svg className="mx-auto h-12 w-12 text-status-approved mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="text-sm font-bold text-text-primary">No pending final approvals</h3>
-          <p className="text-xs text-text-muted mt-1">
-            All 2-way approval documents have been processed or are still at Supervisor review (Step 1).
-          </p>
-        </div>
-      ) : (
-        <ApproverQueue
-          items={step2Items}
-          approverEmail={user.email}
-          hasSignature={hasSignature}
-          signaturePreviewUrl={signaturePreview.previewUrl}
-          approversList={[]}
-          hideHeader
-          onApproveAction={handleApprove}
-          onReturnAction={handleReturn}
-          onReassignAction={handleReassign}
-          onGetDownloadUrlAction={handleGetDownloadUrl}
-        />
-      )}
+      {/* Tabbed Approval Queue View */}
+      <AdminApprovalQueueView
+        allItems={allItems}
+        approverEmail={user.email}
+        hasSignature={hasSignature}
+        signaturePreviewUrl={signaturePreview.previewUrl}
+        approversList={approversList}
+        onApproveAction={handleApprove}
+        onReturnAction={handleReturn}
+        onReassignAction={handleReassign}
+        onGetDownloadUrlAction={handleGetDownloadUrl}
+      />
     </div>
   );
 }

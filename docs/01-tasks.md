@@ -73,13 +73,13 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [x] Signed URLs for every download, expiring within 5 minutes, generated only after a server-side permission check
 - [x] Privacy notice shown and acknowledged at first login, acknowledgement recorded
 - [x] Full FR-26 adversarial suite green in CI, blocking merge:
-  - intern reads another intern's submission
-  - approver acts on an unassigned step
-  - approver acts after reassignment
-  - intern calls an admin endpoint
-  - edit attempt on an approved submission
-  - direct storage access without a signed URL
-  - client-side fetch of a stored signature image
+- [] intern reads another intern's submission
+- [] approver acts on an unassigned step
+- [] approver acts after reassignment
+- [] intern calls an admin endpoint
+- [] edit attempt on an approved submission
+- [] direct storage access without a signed URL
+- [] client-side fetch of a stored signature image
 - [x] Automated accessibility scan + manual keyboard pass, WCAG 2.1 AA
 - [x] Backup restore rehearsed at least once (database; storage object backup/restore not yet exercised — see `14-backup-restore-runbook.md` rehearsal log, 2026-08-27)
 - [ ] Pilot: 3–5 real DTRs through the full flow with the actual approver signing
@@ -103,6 +103,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [ ] CSV export column customization
 - [ ] Inline PDF preview in the approver queue
 - [ ] Bulk export of one intern's approved documents before deletion
+- [ ] Intern self-registration flow with mandatory school* and batch-year* metadata (see `17-intern-self-registration.md`)
 
 ## Cut line if Week 6 is at risk
 

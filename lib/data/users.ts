@@ -19,6 +19,59 @@ const datesSchema = z.object({
   message: "Internship cannot exceed 12 months",
 });
 
+export const onboardingSchema = z.object({
+  school: z.string().trim().min(2, 'Please enter your school or university.').max(200, 'School name must not exceed 200 characters.'),
+  batch: z.string().trim().min(2, 'Please enter your batch or academic year.').max(100, 'Batch name must not exceed 100 characters.'),
+  start: z.string().date(),
+  end: z.string().date(),
+}).refine(data => new Date(data.end) > new Date(data.start), {
+  message: "End date must be after start date",
+}).refine(data => {
+  const start = new Date(data.start);
+  const end = new Date(data.end);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays <= 365;
+}, {
+  message: "Internship cannot exceed 12 months",
+});
+
+export async function completeInternOnboarding(school: string, batch: string, start: string, end: string) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const parsed = onboardingSchema.parse({ school, batch, start, end });
+
+  // Update user profile via adminClient to ensure fields are persisted reliably
+  const adminClient = createAdminClient();
+  const { error: updateError } = await adminClient
+    .from('users')
+    .update({
+      school: parsed.school,
+      batch: parsed.batch,
+      internship_start: parsed.start,
+      internship_end: parsed.end,
+    })
+    .eq('id', user.id);
+
+  if (updateError) throw new Error(updateError.message);
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'INTERN_ONBOARDING_COMPLETED',
+    target_id: user.id,
+    target_type: 'users',
+    source_ip: ip,
+    payload: { school: parsed.school, batch: parsed.batch },
+  });
+
+  return { success: true };
+}
+
 export async function updateInternshipDates(start: string, end: string) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();

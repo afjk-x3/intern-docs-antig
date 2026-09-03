@@ -69,6 +69,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthCallback = pathname.startsWith('/auth');
   const isLoginPage = pathname.startsWith('/login');
+  const isRegisterPage = pathname.startsWith('/register');
   const isAcceptInvite = pathname.startsWith('/accept-invite');
 
   // Allow all /auth routes unconditionally (callback code exchange, signout, OTP verification)
@@ -76,9 +77,9 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Unauthenticated users can access /login and /accept-invite
+  // Unauthenticated users can access /login, /register, and /accept-invite
   if (!user) {
-    if (isLoginPage || isAcceptInvite) {
+    if (isLoginPage || isRegisterPage || isAcceptInvite) {
       return supabaseResponse;
     }
     const redirectUrl = request.nextUrl.clone();
@@ -86,8 +87,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Authenticated users visiting /login should be sent to their dashboard
-  if (isLoginPage) {
+  // Authenticated users visiting /login or /register should be sent to their dashboard
+  if (isLoginPage || isRegisterPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/';
     return NextResponse.redirect(redirectUrl);

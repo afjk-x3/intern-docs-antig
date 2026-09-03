@@ -21,9 +21,25 @@ export default function AcceptInvitePage() {
       try {
         if (typeof window === 'undefined') return;
 
-        // 1. Parse Hash Fragment (Supabase redirect with #access_token=...&refresh_token=...)
-        if (window.location.hash && window.location.hash.includes('access_token')) {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        // 1. Check for error in hash or query
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryError = urlParams.get('error_description') || urlParams.get('error');
+        if (queryError) {
+          setErrorMsg(decodeURIComponent(queryError.replace(/\+/g, ' ')));
+        }
+
+        // 2. Parse Hash Fragment (Supabase redirect with #access_token=...&refresh_token=...)
+        if (window.location.hash) {
+          const hashClean = window.location.hash.startsWith('#')
+            ? window.location.hash.substring(1)
+            : window.location.hash;
+          const hashParams = new URLSearchParams(hashClean);
+
+          const hashError = hashParams.get('error_description') || hashParams.get('error');
+          if (hashError) {
+            setErrorMsg(decodeURIComponent(hashError.replace(/\+/g, ' ')));
+          }
+
           const access_token = hashParams.get('access_token');
           const refresh_token = hashParams.get('refresh_token');
 
@@ -34,32 +50,40 @@ export default function AcceptInvitePage() {
             });
             if (error) {
               console.warn('[Auth] setSession from hash error:', error.message);
+              setErrorMsg(error.message);
             } else if (data.user) {
               setUserEmail(data.user.email || null);
             }
           }
         }
 
-        // 2. Parse Query Params (PKCE code or OTP token_hash)
-        const urlParams = new URLSearchParams(window.location.search);
-        const token_hash = urlParams.get('token_hash');
-        const type = urlParams.get('type') as 'invite' | 'recovery' | 'email' | null;
+        // 3. Parse Query Params (PKCE code or OTP token_hash)
+        const token_hash = urlParams.get('token_hash') || urlParams.get('token');
+        const type = (urlParams.get('type') as any) || 'invite';
         const code = urlParams.get('code');
 
-        if (token_hash && type) {
+        if (token_hash) {
           const { data, error: otpErr } = await supabase.auth.verifyOtp({ token_hash, type });
-          if (!otpErr && data.user) {
+          if (otpErr) {
+            console.warn('[Auth] verifyOtp error:', otpErr.message);
+            setErrorMsg(otpErr.message);
+          } else if (data.user) {
             setUserEmail(data.user.email || null);
           }
         } else if (code) {
           const { data, error: codeErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (!codeErr && data.user) {
+          if (codeErr) {
+            console.warn('[Auth] exchangeCode error:', codeErr.message);
+            setErrorMsg(codeErr.message);
+          } else if (data.user) {
             setUserEmail(data.user.email || null);
           }
         }
 
-        // 3. Fallback: Check existing session
-        const { data: { user } } = await supabase.auth.getUser();
+        // 4. Fallback: Check existing session in cookies/storage
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           setUserEmail(user.email || null);
         }
@@ -101,7 +125,9 @@ export default function AcceptInvitePage() {
 
     try {
       // 1. Verify / recover active session if needed
-      let { data: { user } } = await supabase.auth.getUser();
+      let {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user && typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -115,7 +141,9 @@ export default function AcceptInvitePage() {
       }
 
       if (!user) {
-        throw new Error('Your invitation session has expired or is invalid. Please request a new invite link.');
+        throw new Error(
+          'Your invitation session has expired or is invalid. Please request a new invite link.'
+        );
       }
 
       // 2. Update the user password
@@ -127,7 +155,7 @@ export default function AcceptInvitePage() {
         throw new Error(updateError.message);
       }
 
-      // 3. Redirect to dashboard/onboarding
+      // 3. Redirect to root dispatcher (routes to privacy-notice -> onboarding -> intern)
       router.push('/');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to set password. Please try again.';
@@ -146,7 +174,12 @@ export default function AcceptInvitePage() {
           <h1 className="text-xl font-bold text-text-primary">Welcome to InternDocs</h1>
           <p className="text-xs text-text-muted">
             {userEmail ? (
-              <>Setting up account for <span className="font-semibold text-text-primary">{userEmail}</span></>
+              <>
+                Setting up account for{' '}
+                <span className="font-semibold text-text-primary">{userEmail}</span>
+              </>
+            ) : isVerifying ? (
+              'Verifying your invitation session...'
             ) : (
               'Set your password to activate your account.'
             )}
@@ -154,51 +187,96 @@ export default function AcceptInvitePage() {
         </div>
 
         {errorMsg && (
-          <div role="alert" className="rounded-xl bg-rose-50 p-3.5 text-xs text-rose-800 border border-rose-200">
+          <div
+            role="alert"
+            className="rounded-xl bg-rose-50 p-3.5 text-xs text-rose-800 border border-rose-200 leading-relaxed"
+          >
             {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-text-primary mb-1.5" htmlFor="password">
-              New Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={12}
-              required
-              placeholder="Minimum 12 characters"
-              className="w-full rounded-xl border border-border-default p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            />
-            <p className="mt-1 text-[11px] text-text-muted">Must be at least 12 characters long.</p>
+        {/* If verifying, show spinner */}
+        {isVerifying && (
+          <div className="flex flex-col items-center justify-center py-6 space-y-3">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-primary border-t-transparent" />
+            <p className="text-xs text-text-muted">Checking activation link...</p>
           </div>
+        )}
 
-          <div>
-            <label className="block text-xs font-semibold text-text-primary mb-1.5" htmlFor="confirmPassword">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              minLength={12}
-              required
-              placeholder="Re-enter your password"
-              className="w-full rounded-xl border border-border-default p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            />
+        {/* If not verifying and no user email, show clear instructions instead of a broken password form */}
+        {!isVerifying && !userEmail && (
+          <div className="space-y-4 text-center pt-2">
+            <p className="text-xs text-text-muted leading-relaxed">
+              No active invitation session was found. If you received an activation email, please open the link directly from your inbox.
+            </p>
+            <div className="space-y-2 pt-2">
+              <a
+                href="/register"
+                className="inline-flex items-center justify-center w-full rounded-xl bg-brand-primary py-2.5 text-xs font-semibold text-white hover:bg-brand-primary-hover shadow-xs transition-colors"
+              >
+                Request New Activation Link
+              </a>
+              <a
+                href="/login"
+                className="inline-flex items-center justify-center w-full rounded-xl border border-border-default bg-white py-2.5 text-xs font-semibold text-text-primary hover:bg-slate-50 transition-colors"
+              >
+                Back to Sign in
+              </a>
+            </div>
           </div>
+        )}
 
-          <Button type="submit" disabled={loading || isVerifying} className="w-full" size="lg">
-            {loading ? 'Activating Account...' : isVerifying ? 'Verifying Invite...' : 'Set Password & Enter Portal'}
-          </Button>
-        </form>
+        {/* If user session is active, show the password form */}
+        {!isVerifying && userEmail && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                className="block text-xs font-semibold text-text-primary mb-1.5"
+                htmlFor="password"
+              >
+                New Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={12}
+                required
+                placeholder="Minimum 12 characters"
+                className="w-full rounded-xl border border-border-default p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+              />
+              <p className="mt-1 text-[11px] text-text-muted">
+                Must be at least 12 characters long.
+              </p>
+            </div>
+
+            <div>
+              <label
+                className="block text-xs font-semibold text-text-primary mb-1.5"
+                htmlFor="confirmPassword"
+              >
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={12}
+                required
+                placeholder="Re-enter your password"
+                className="w-full rounded-xl border border-border-default p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+              />
+            </div>
+
+            <Button type="submit" disabled={loading} className="w-full" size="lg">
+              {loading ? 'Activating Account...' : 'Set Password & Enter Portal'}
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );

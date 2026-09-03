@@ -149,6 +149,19 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
       >
         Sign in
       </Button>
+
+      {/* Sign-up CTA */}
+      <div className="pt-2 text-center border-t border-border-default">
+        <p className="text-sm text-text-muted">
+          Don&apos;t have an account yet?{' '}
+          <a
+            href="/register"
+            className="font-semibold text-brand-primary hover:text-brand-primary-hover hover:underline transition-colors"
+          >
+            Sign up as an Intern
+          </a>
+        </p>
+      </div>
     </form>
   );
 }

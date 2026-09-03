@@ -21,7 +21,7 @@ async function getAcceptInviteUrl(): Promise<string> {
   const reqHeaders = await headers();
   const host = reqHeaders.get('x-forwarded-host') || reqHeaders.get('host') || 'localhost:3000';
   const proto = reqHeaders.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
-  return `${proto}://${host}/accept-invite`;
+  return `${proto}://${host}/auth/callback?next=/accept-invite`;
 }
 
 export async function inviteUser(email: string, role: string, school?: string, batch?: string) {
@@ -204,3 +204,130 @@ export async function login(formData: FormData) {
   
   return { success: true };
 }
+
+export const internRegisterEmailSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email('Please enter a valid email address.')
+    .max(255),
+});
+
+export type InternRegisterEmailInput = z.infer<typeof internRegisterEmailSchema>;
+
+export async function registerIntern(emailOrFormData: string | FormData) {
+  const rawEmail =
+    typeof emailOrFormData === 'string'
+      ? emailOrFormData
+      : ((emailOrFormData.get('email') as string) || '');
+
+  const parsed = internRegisterEmailSchema.safeParse({ email: rawEmail });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Invalid email address.' };
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const adminClient = createAdminClient();
+
+  // 1. Check if user already exists in public.users
+  const { data: existingDbUser } = await adminClient
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existingDbUser) {
+    return { success: false, error: 'An account with this email already exists. Please sign in.' };
+  }
+
+  const acceptInviteUrl = await getAcceptInviteUrl();
+  let userId: string;
+  let inviteLink: string | null = null;
+
+  // 2. Try standard inviteUserByEmail
+  const { data: invitedUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+    redirectTo: acceptInviteUrl,
+  });
+
+  if (invitedUser?.user) {
+    userId = invitedUser.user.id;
+  } else {
+    // 3. Fallback: generate invite link directly
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'invite',
+      email,
+      options: {
+        redirectTo: acceptInviteUrl,
+      },
+    });
+
+    if (linkData?.user) {
+      userId = linkData.user.id;
+      inviteLink = linkData.properties?.action_link || null;
+    } else {
+      // 4. Fallback: Lookup existing auth user
+      const { data: listData } = await adminClient.auth.admin.listUsers();
+      const existingAuth = listData?.users?.find((u) => u.email?.toLowerCase() === email);
+      if (existingAuth) {
+        userId = existingAuth.id;
+        const { data: magicLinkData } = await adminClient.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: { redirectTo: acceptInviteUrl },
+        });
+        inviteLink = magicLinkData?.properties?.action_link || null;
+      } else {
+        throw new Error(`Failed to generate activation link: ${inviteError?.message || linkError?.message}`);
+      }
+    }
+  }
+
+  // 4. Upsert user profile into public.users with strict role: 'intern'
+  const { error: profileError } = await adminClient.from('users').upsert({
+    id: userId,
+    email,
+    role: 'intern',
+  });
+
+  if (profileError) {
+    console.error('[registerIntern] profile creation error:', profileError.message);
+  }
+
+  // 5. Send email with setup link via Resend (if inviteLink available)
+  if (inviteLink) {
+    try {
+      await sendEmailWithRetry(
+        email,
+        'Welcome to InternDocs — Complete Your Registration',
+        `
+        <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
+          <h2>Welcome to InternDocs!</h2>
+          <p>You requested to register as an intern. Click the button below to set up your password and begin your onboarding:</p>
+          <p style="margin: 25px 0;">
+            <a href="${inviteLink}" style="background-color: #1B3251; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Set Up Password</a>
+          </p>
+          <p style="font-size: 12px; color: #64748b;">If you did not request this registration, you can safely ignore this email.</p>
+        </div>
+        `
+      );
+    } catch (mailErr) {
+      console.warn('[registerIntern] notification email warning:', mailErr);
+    }
+  }
+
+  // 6. Record append-only audit log
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: userId,
+    action: 'INTERN_REGISTRATION_REQUESTED',
+    target_id: userId,
+    target_type: 'users',
+    source_ip: ip,
+    payload: { email },
+  });
+
+  return { success: true, email };
+}
+

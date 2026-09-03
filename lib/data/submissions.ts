@@ -849,9 +849,10 @@ export async function approveSubmissionSigned(submissionId: string) {
         .eq('id', prevAppr.approver_id)
         .single();
 
+      const isPrevAdmin = prevUserData?.role === 'admin' || prevUserData?.role === 'system_admin';
       signatories.push({
         stepNumber: prevAppr.step,
-        roleTitle: prevAppr.step === 1 ? 'Supervisor Review:' : `Step ${prevAppr.step} Review:`,
+        roleTitle: prevAppr.step === 1 ? (isPrevAdmin ? 'Supervisor Review (Admin):' : 'Supervisor Review:') : `Step ${prevAppr.step} Review:`,
         signaturePngBuffer: prevSig.buffer,
         signatureMimeType: prevSig.mimeType,
         approverName: prevUserData?.email || 'Supervisor',
@@ -864,9 +865,14 @@ export async function approveSubmissionSigned(submissionId: string) {
 
   // Include current step approver signature
   const currentSig = await getSignatureBytesForCompositing(user.id);
+  const isAdminRole = role === UserRole.ADMIN || role === UserRole.SYSTEM_ADMIN;
   signatories.push({
     stepNumber: currentStep,
-    roleTitle: isFinalStep && steps.length > 1 ? 'Final Admin Approval:' : (currentStep === 1 && steps.length > 1 ? 'Supervisor Review:' : 'Digitally Approved by:'),
+    roleTitle: isFinalStep && steps.length > 1
+      ? 'Final Admin Approval:'
+      : (currentStep === 1 && steps.length > 1
+          ? (isAdminRole ? 'Supervisor Review (Admin):' : 'Supervisor Review:')
+          : 'Digitally Approved by:'),
     signaturePngBuffer: currentSig.buffer,
     signatureMimeType: currentSig.mimeType,
     approverName: dbUser.email || 'Authorized Signatory',
