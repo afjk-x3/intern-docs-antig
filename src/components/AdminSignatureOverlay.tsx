@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { SignaturePad } from './SignaturePad';
+import { PrintedNameForm } from './PrintedNameForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -10,6 +11,14 @@ interface AdminSignatureOverlayProps {
   signaturePreviewUrl?: string | null;
   lastUpdatedAt?: string | null;
   onSaveSignatureAction: (formData: FormData) => Promise<{ success?: boolean; error?: string }>;
+  /**
+   * Admins are also an approver step (final sign-off), so they need the same printed
+   * name FR-11 composites onto the PDF -- but only a plain 'admin', not system_admin
+   * (system_admin doesn't act as a routing-template approver). Optional so this overlay
+   * still works if the caller doesn't wire it up; the page decides who gets it.
+   */
+  currentFullName?: string | null;
+  onSaveNameAction?: (fullName: string) => Promise<{ success?: boolean; error?: string }>;
 }
 
 export function AdminSignatureOverlay({
@@ -17,6 +26,8 @@ export function AdminSignatureOverlay({
   signaturePreviewUrl,
   lastUpdatedAt,
   onSaveSignatureAction,
+  currentFullName,
+  onSaveNameAction,
 }: AdminSignatureOverlayProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -76,7 +87,13 @@ export function AdminSignatureOverlay({
             </div>
           </DialogHeader>
 
-          <div className="p-6 max-h-[80vh] overflow-y-auto">
+          <div className="p-6 max-h-[80vh] overflow-y-auto space-y-6">
+            {onSaveNameAction && (
+              <PrintedNameForm
+                currentName={currentFullName ?? null}
+                onSaveNameAction={onSaveNameAction}
+              />
+            )}
             <SignaturePad
               currentSignatureUrl={signaturePreviewUrl}
               lastUpdatedAt={lastUpdatedAt}

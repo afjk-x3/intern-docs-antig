@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { XIcon } from 'lucide-react';
 import { ConfirmAction } from '@/components/ConfirmAction';
+import { Button } from '@/components/ui/button';
 import { humanizeCode } from '@/lib/utils';
 
 export interface ManagedUser {
@@ -21,9 +22,11 @@ interface UserManagementTableProps {
   onRoleChangeAction: (formData: FormData) => Promise<void>;
   /** Saves an intern's school/batch group. Optional so this table still works anywhere groups aren't wired up. */
   onGroupChangeAction?: (formData: FormData) => Promise<void>;
+  /** FR-3 admin override: change an intern's internship dates even after their own lock (first approval). */
+  onDatesChangeAction?: (formData: FormData) => Promise<{ success?: boolean; error?: string }>;
 }
 
-export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAction }: UserManagementTableProps) {
+export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAction, onDatesChangeAction }: UserManagementTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [schoolFilter, setSchoolFilter] = useState<string>('ALL');
@@ -34,6 +37,10 @@ export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAc
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [groupDrafts, setGroupDrafts] = useState<Record<string, { school: string; batch: string }>>({});
   const [savingGroupFor, setSavingGroupFor] = useState<string | null>(null);
+  const [dateDrafts, setDateDrafts] = useState<Record<string, { start: string; end: string }>>({});
+  const [savingDatesFor, setSavingDatesFor] = useState<string | null>(null);
+  const [isSavingAllDates, setIsSavingAllDates] = useState(false);
+  const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
 
   const schoolOptions = useMemo(
     () => Array.from(new Set(users.map((u) => u.school).filter((s): s is string => !!s))).sort(),
@@ -76,6 +83,58 @@ export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAc
       setTimeout(() => setStatusMessage(null), 3000);
     } finally {
       setSavingGroupFor(null);
+    }
+  };
+
+  const getDateDraft = (u: ManagedUser) => dateDrafts[u.id] ?? { start: u.internship_start || '', end: u.internship_end || '' };
+
+  const isDatesDirty = (u: ManagedUser) => {
+    const draft = getDateDraft(u);
+    return draft.start !== (u.internship_start || '') || draft.end !== (u.internship_end || '');
+  };
+
+  const handleDateFieldChange = (u: ManagedUser, field: 'start' | 'end', value: string) => {
+    setDateErrors((prev) => ({ ...prev, [u.id]: '' }));
+    setDateDrafts((prev) => ({ ...prev, [u.id]: { ...getDateDraft(u), [field]: value } }));
+  };
+
+  const dirtyDateUsers = useMemo(() => users.filter(isDatesDirty), [users, dateDrafts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Saves every row with an unsaved date change at once, from the single header button. */
+  const handleSaveAllDates = async () => {
+    if (!onDatesChangeAction || dirtyDateUsers.length === 0) return;
+
+    setIsSavingAllDates(true);
+    let successCount = 0;
+    try {
+      for (const u of dirtyDateUsers) {
+        const draft = getDateDraft(u);
+        if (!draft.start || !draft.end) continue;
+
+        setSavingDatesFor(u.id);
+        try {
+          const formData = new FormData();
+          formData.set('userId', u.id);
+          formData.set('start', draft.start);
+          formData.set('end', draft.end);
+          const res = await onDatesChangeAction(formData);
+          if (res.error) {
+            setDateErrors((prev) => ({ ...prev, [u.id]: res.error! }));
+          } else {
+            successCount++;
+          }
+        } catch (e: unknown) {
+          setDateErrors((prev) => ({ ...prev, [u.id]: e instanceof Error ? e.message : 'Failed to save' }));
+        }
+      }
+    } finally {
+      setSavingDatesFor(null);
+      setIsSavingAllDates(false);
+    }
+
+    if (successCount > 0) {
+      setStatusMessage(`Internship dates updated for ${successCount} intern${successCount === 1 ? '' : 's'}.`);
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
@@ -129,14 +188,27 @@ export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAc
           <p className="text-xs text-text-muted mt-0.5">Filter by role, school, batch, or search by email address.</p>
         </div>
 
-        {statusMessage && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-status-approved/10 px-3 py-1.5 rounded-xl border border-status-approved/30 animate-in fade-in">
-            <svg className="h-3.5 w-3.5 text-status-approved shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {statusMessage}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {statusMessage && (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-status-approved/10 px-3 py-1.5 rounded-xl border border-status-approved/30 animate-in fade-in">
+              <svg className="h-3.5 w-3.5 text-status-approved shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {statusMessage}
+            </div>
+          )}
+
+          {onDatesChangeAction && dirtyDateUsers.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              disabled={isSavingAllDates}
+              onClick={handleSaveAllDates}
+            >
+              {isSavingAllDates ? 'Saving…' : `Save Changes (${dirtyDateUsers.length})`}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -295,9 +367,43 @@ export function UserManagementTable({ users, onRoleChangeAction, onGroupChangeAc
                   )}
                 </td>
                 <td className="py-3.5 px-4 text-text-muted font-mono text-[11px]">
-                  {u.internship_start && u.internship_end
-                    ? `${u.internship_start} to ${u.internship_end}`
-                    : '—'}
+                  {u.role === 'intern' && onDatesChangeAction ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <label className="sr-only" htmlFor={`date-start-${u.id}`}>Internship start for {u.email}</label>
+                        <input
+                          id={`date-start-${u.id}`}
+                          type="date"
+                          value={getDateDraft(u).start}
+                          onChange={(e) => handleDateFieldChange(u, 'start', e.target.value)}
+                          disabled={savingDatesFor === u.id}
+                          className="w-32 rounded-lg border border-transparent hover:border-border-default focus:border-brand-primary bg-transparent p-1.5 text-[11px] text-text-primary outline-none disabled:opacity-50"
+                        />
+                        <span>to</span>
+                        <label className="sr-only" htmlFor={`date-end-${u.id}`}>Internship end for {u.email}</label>
+                        <input
+                          id={`date-end-${u.id}`}
+                          type="date"
+                          value={getDateDraft(u).end}
+                          onChange={(e) => handleDateFieldChange(u, 'end', e.target.value)}
+                          disabled={savingDatesFor === u.id}
+                          className="w-32 rounded-lg border border-transparent hover:border-border-default focus:border-brand-primary bg-transparent p-1.5 text-[11px] text-text-primary outline-none disabled:opacity-50"
+                        />
+                      </div>
+                      {isDatesDirty(u) && !dateErrors[u.id] && (
+                        <span className="text-[10px] text-amber-700 font-sans font-semibold">
+                          {savingDatesFor === u.id ? 'Saving…' : 'Unsaved — use Save Changes above'}
+                        </span>
+                      )}
+                      {dateErrors[u.id] && (
+                        <span role="alert" className="text-[10px] text-rose-700 font-sans">{dateErrors[u.id]}</span>
+                      )}
+                    </div>
+                  ) : (
+                    u.internship_start && u.internship_end
+                      ? `${u.internship_start} to ${u.internship_end}`
+                      : '—'
+                  )}
                 </td>
                 <td className="py-3.5 px-4">
                   <label htmlFor={`role-${u.id}`} className="sr-only">

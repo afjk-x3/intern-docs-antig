@@ -75,7 +75,7 @@ export async function createRequirement(input: z.infer<typeof requirementSchema>
       due_date_value: parsed.due_date_value,
       routing_template_id: parsed.routing_template_id || null,
       version_number: 1,
-      signature_config: { page: 'last', x: 380, y: 80, width: 160, height: 60 },
+      signature_config: { page: 'last', x: 380, y: 80, width: 90, height: 34 },
     })
     .select()
     .single();
@@ -154,4 +154,113 @@ export async function updateRequirement(id: string, input: Partial<z.infer<typeo
   });
 
   return updatedReq;
+}
+
+const TEMPLATE_ACCEPTED_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+const TEMPLATE_MAX_BYTES = 10 * 1024 * 1024; // matches the `templates` bucket's file_size_limit
+
+/**
+ * FR-4: "an optional template file to download" -- a blank form an intern can download
+ * before filling it out. The `templates` bucket (created in
+ * 20240101000002_phase2_requirements_submissions.sql) has no client-readable storage
+ * policy, same as `signatures`/`submissions`, so both this upload and the download URL
+ * below go through the admin client only.
+ */
+export async function uploadRequirementTemplate(requirementId: string, formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
+  if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    throw new Error('Unauthorized: Only administrators can set a requirement template.');
+  }
+
+  const file = formData.get('file') as File | null;
+  if (!file || file.size === 0) throw new Error('Please choose a file to upload.');
+  if (!TEMPLATE_ACCEPTED_TYPES.includes(file.type)) {
+    throw new Error('Template must be a PDF, PNG, or JPEG file.');
+  }
+  if (file.size > TEMPLATE_MAX_BYTES) {
+    throw new Error('Template file must be under 10 MB.');
+  }
+
+  const adminClient = createAdminClient();
+  const ext = file.type === 'application/pdf' ? 'pdf' : file.type === 'image/png' ? 'png' : 'jpg';
+  const storagePath = `${requirementId}/template.${ext}`;
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await adminClient.storage
+    .from('templates')
+    .upload(storagePath, fileBuffer, { contentType: file.type, upsert: true });
+
+  if (uploadError) {
+    throw new Error(`Failed to upload template: ${uploadError.message}`);
+  }
+
+  const { error: updateError } = await adminClient
+    .from('requirements')
+    .update({ template_url: storagePath })
+    .eq('id', requirementId);
+
+  if (updateError) {
+    throw new Error(`Failed to save template reference: ${updateError.message}`);
+  }
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'UPLOAD_REQUIREMENT_TEMPLATE',
+    target_id: requirementId,
+    target_type: 'requirements',
+    source_ip: ip,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Short-lived signed URL (FR-25: expires within 5 minutes) for downloading a
+ * requirement's template file. Available to any authenticated user -- requirements
+ * themselves are already visible cohort-wide (every intern's checklist shows every
+ * requirement), and a blank template is not personal data.
+ */
+export async function getRequirementTemplateDownloadUrl(requirementId: string): Promise<{ signedUrl: string }> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const adminClient = createAdminClient();
+  const { data: req, error: reqError } = await adminClient
+    .from('requirements')
+    .select('template_url')
+    .eq('id', requirementId)
+    .single();
+
+  if (reqError || !req?.template_url) {
+    throw new Error('No template file is available for this requirement.');
+  }
+
+  const { data: signed, error: signError } = await adminClient.storage
+    .from('templates')
+    .createSignedUrl(req.template_url, 300);
+
+  if (signError || !signed?.signedUrl) {
+    throw new Error('Failed to generate a download link for the template.');
+  }
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'DOWNLOAD_REQUIREMENT_TEMPLATE',
+    target_id: requirementId,
+    target_type: 'requirements',
+    source_ip: ip,
+  });
+
+  return { signedUrl: signed.signedUrl };
 }

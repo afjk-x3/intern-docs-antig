@@ -1,7 +1,7 @@
 # Backup & Restore Rehearsal Runbook
 
 > **Project**: InternDocs  
-> **Last rehearsed**: 2026-08-27 (local)  
+> **Last rehearsed**: 2026-08-28 (local)  
 > **Next scheduled rehearsal**: _quarterly_
 
 ## Overview
@@ -74,6 +74,21 @@ pg_dump "$SUPABASE_DB_CONNECTION_STRING" \
 
 Supabase Storage buckets are **not** included in `pg_dump`. Back them up separately.
 
+> **Corrected 2026-08-28, from an actual rehearsal**: `supabase storage cp`/`ls` against
+> `--local` failed outright on CLI 2.116.0 -- first `LegacyExperimentalRequiredError`
+> (needs `--experimental`), then `LegacyStorageUnsupportedOperationError: Unsupported
+> operation` on every `ss:///` local copy attempted (single-file and `-r` directory
+> alike), even with the storage-api container confirmed healthy. This may be
+> version-specific or `--linked` (hosted) may behave differently -- not confirmed either
+> way, since a rehearsal must never touch the hosted project. **What is confirmed
+> working**, and is what actually got rehearsed: the same `@supabase/supabase-js`
+> `.storage.from(bucket).upload/download/list/remove()` calls the application code
+> itself uses (`lib/data/signatures.ts`, `lib/data/submissions.ts`,
+> `lib/data/requirements.ts`), driven from a small script against the service-role key.
+> This is arguably the more representative rehearsal anyway -- it's the exact code path
+> real backups would need to replicate. If the CLI commands below work in your
+> environment, prefer them for convenience; if not, fall back to the JS SDK approach.
+
 ### 2a. List all objects in each bucket
 
 ```bash
@@ -99,6 +114,16 @@ npx supabase storage cp -r ss:///signatures ./backup_storage/signatures --linked
 ```bash
 # Count files downloaded vs listed
 find ./backup_storage -type f | wc -l
+```
+
+### 2d. JS SDK fallback (confirmed working, 2026-08-28 rehearsal)
+
+```js
+// Same client shape as lib/supabase/admin.ts, pointed at whichever project you're
+// backing up. For each bucket: list(prefix), download(path) each object, write bytes
+// to ./backup_storage/<bucket>/<path> preserving the storage path structure.
+const { data } = await client.storage.from(bucket).download(path);
+const buf = Buffer.from(await data.arrayBuffer());
 ```
 
 ---
@@ -147,6 +172,13 @@ npx supabase db push --linked
 npx supabase storage cp -r ./backup_storage/submissions ss:///submissions --linked
 npx supabase storage cp -r ./backup_storage/templates ss:///templates --linked
 npx supabase storage cp -r ./backup_storage/signatures ss:///signatures --linked
+```
+
+If the CLI commands above don't work (see the section 2 note), the JS SDK fallback:
+
+```js
+const buf = readFileSync(localBackupPath);
+const { error } = await client.storage.from(bucket).upload(path, buf, { upsert: true, contentType });
 ```
 
 ---
@@ -255,13 +287,13 @@ Use this checklist each time you rehearse the backup/restore cycle.
 
 - [x] **Pre-backup**: Record row counts for all tables (query 5a)
 - [x] **Backup**: Run database dump (section 1)
-- [ ] **Backup**: Run storage download (section 2) — not exercised this pass, see notes
+- [x] **Backup**: Run storage download (section 2) — exercised 2026-08-28 via the JS SDK fallback, see log below
 - [x] **Restore**: Reset a clean local instance and restore the dump (section 3a)
-- [ ] **Restore**: Upload storage files to the clean instance (section 4) — not exercised this pass, see notes
+- [x] **Restore**: Upload storage files to the clean instance (section 4) — exercised 2026-08-28
 - [x] **Verify**: Row counts match pre-backup (query 5a)
 - [x] **Verify**: RLS is enabled on all tables (query 5b)
 - [x] **Verify**: Append-only constraints intact (query 5c)
-- [ ] **Verify**: No stale file bytes violating retention (query 5d) — no data old enough to exercise this on a freshly-seeded rehearsal dataset
+- [ ] **Verify**: No stale file bytes violating retention (query 5d) — still not exercised; needs a rehearsal dataset with a submission old enough to be retention-eligible, which this pass (same as 2026-08-27) did not seed
 - [x] **Verify**: Storage buckets are private (query 5f)
 - [x] **Sign-off**: Record date and result below
 
@@ -270,3 +302,4 @@ Use this checklist each time you rehearse the backup/restore cycle.
 | Date | Performed by | Environment | Result | Notes |
 |---|---|---|---|---|
 | 2026-08-27 | Claude (session work, on behalf of the user) | local (Docker, `supabase db reset` disaster simulation) | **Success** | Seeded one realistic row per table (user, submission, version, approval, audit entry), recorded baseline counts, took a real `--data-only --use-copy --schema public,auth` dump, wiped the DB via `db reset`, restored the dump, and confirmed row counts matched exactly and a joined query across all 4 restored tables reproduced the seeded record intact. RLS-enabled and append-only-grant checks (5b/5c) and the private-bucket check (5f) all passed post-restore. Storage object backup/restore (section 2/4) and the stale-file-bytes check (5d) were **not exercised** -- the rehearsal dataset had no actual file bytes uploaded and nothing old enough to be retention-eligible. This runbook itself had two inaccuracies corrected in this pass: `db dump` without `--data-only` is schema-only, not "schema + data" as previously written, and `privacy_acknowledgements` was documented as a table before FR-25 shipped it as a `users.privacy_acknowledged_at` column instead. All rehearsal data and dump files were deleted afterward; nothing from this rehearsal was committed. |
+| 2026-08-28 | Claude (session work, on behalf of the user) | local (Docker) | **Success** | Closed the one gap the 2026-08-27 rehearsal explicitly left open: storage object backup/restore, with real file bytes, across all three buckets. Uploaded a distinct real object to `submissions`, `templates`, and `signatures` (a PNG for `signatures` specifically -- that bucket rejects non-image mime types, confirming FR-9's upload validation is enforced at the storage-policy level too, not just in `lib/data/signatures.ts`), recorded each object's SHA-256, downloaded all three to a local `./backup_storage/` mirroring the bucket/path structure, deleted the originals from storage to simulate total loss (confirmed empty via `list()`), re-uploaded from the local backup, then independently re-downloaded and re-hashed all three -- every hash matched the original upload byte-for-byte. `supabase storage cp`/`ls` against `--local` did not work on the installed CLI (2.116.0) -- see the corrected section 2 note for the exact errors and the working JS SDK fallback used instead, which is now the rehearsal's primary documented method until the CLI path is reconfirmed. Query 5d (stale file bytes) remains unexercised -- still needs a submission old enough to be retention-eligible, which is a data-seeding gap, not a mechanism gap. All rehearsal objects, the local `./backup_storage/` directory, and the throwaway Node script used to drive it were deleted after verification; nothing from this rehearsal was committed. |

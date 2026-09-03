@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/blob-report
 
 # next.js
 /.next/
@@ -30,8 +33,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files -- .env.example is the one exception: 12-backend-security-rules.md #10
+# requires it committed (real values never committed, only the variable names)
 .env*
+!.env.example
 
 # vercel
 .vercel

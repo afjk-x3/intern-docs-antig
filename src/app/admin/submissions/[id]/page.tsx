@@ -1,8 +1,10 @@
 import { createClient } from '@lib/supabase/server';
 import { createAdminClient } from '@lib/supabase/admin';
+import { cancelSubmission, reopenSubmission } from '@lib/data/submissions';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SubmissionAdminActions } from '@/components/SubmissionAdminActions';
 import { humanizeCode } from '@/lib/utils';
 
 export default async function AdminSubmissionViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +35,28 @@ export default async function AdminSubmissionViewPage({ params }: { params: Prom
 
   if (error || !submission) {
     notFound();
+  }
+
+  async function handleCancel(reason: string) {
+    'use server';
+    try {
+      await cancelSubmission(id, reason);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to cancel submission';
+      return { error: msg };
+    }
+  }
+
+  async function handleReopen() {
+    'use server';
+    try {
+      await reopenSubmission(id);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to reopen submission';
+      return { error: msg };
+    }
   }
 
   // Find active version
@@ -67,8 +91,13 @@ export default async function AdminSubmissionViewPage({ params }: { params: Prom
                 <strong>Requirement:</strong> {submission.requirements?.name}
               </p>
             </div>
-            <div>
+            <div className="flex flex-col items-end gap-2">
               <StatusBadge state={submission.state} />
+              <SubmissionAdminActions
+                state={submission.state}
+                onCancelAction={handleCancel}
+                onReopenAction={handleReopen}
+              />
             </div>
           </div>
 

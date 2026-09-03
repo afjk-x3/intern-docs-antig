@@ -7,6 +7,7 @@ import {
 } from '@lib/data/submissions';
 import { hasEnrolledSignature, getOwnSignaturePreviewUrl, enrollSignature } from '@lib/data/signatures';
 import { getApproversList } from '@lib/data/routing';
+import { getOwnFullName, setFullName } from '@lib/data/users';
 import { createClient } from '@lib/supabase/server';
 import { AdminApprovalQueueView } from '@/components/AdminApprovalQueueView';
 import { AdminSignatureOverlay } from '@/components/AdminSignatureOverlay';
@@ -32,11 +33,17 @@ export default async function AdminFinalApprovalPage() {
     redirect('/login');
   }
 
-  const [allItems, hasSignature, signaturePreview, approversList] = await Promise.all([
+  // Admins are also an approver step (final sign-off), so they need a printed name too
+  // (FR-11) -- but only a plain 'admin', not system_admin, which doesn't act as a
+  // routing-template approver.
+  const isPlainAdmin = dbUser.role === 'admin';
+
+  const [allItems, hasSignature, signaturePreview, approversList, currentFullName] = await Promise.all([
     getApproverQueue(),
     hasEnrolledSignature(user.id),
     getOwnSignaturePreviewUrl(),
     getApproversList(),
+    isPlainAdmin ? getOwnFullName() : Promise.resolve(null),
   ]);
 
   async function handleApprove(submissionId: string) {
@@ -94,6 +101,17 @@ export default async function AdminFinalApprovalPage() {
     }
   }
 
+  async function handleSaveName(fullName: string) {
+    'use server';
+    try {
+      await setFullName(fullName);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save printed name';
+      return { error: msg };
+    }
+  }
+
   return (
     <div className="p-6 md:p-10 space-y-8">
       {/* Page Header with Top-Right Signature Overlay Button */}
@@ -112,6 +130,7 @@ export default async function AdminFinalApprovalPage() {
             signaturePreviewUrl={signaturePreview.previewUrl}
             lastUpdatedAt={signaturePreview.updatedAt}
             onSaveSignatureAction={handleSaveSignature}
+            {...(isPlainAdmin ? { currentFullName, onSaveNameAction: handleSaveName } : {})}
           />
         </div>
       </div>

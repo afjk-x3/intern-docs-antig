@@ -74,7 +74,7 @@ export default async function LoginPage({
           <h1 className="text-4xl lg:text-[3.25rem] font-extrabold leading-[1.08] tracking-tight">
             Welcome
             <br />
-            <span className="text-brand-accent">back.</span>
+            <span className="text-brand-accent-on-dark">back.</span>
           </h1>
           <p className="mt-5 text-[15px] text-white/55 leading-relaxed max-w-xs">
             Track your internship requirements, upload documents, and stay on top of deadlines — all in one place.

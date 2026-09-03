@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { headers } from 'next/headers';
 
 import { sendEmailWithRetry } from '../email/resend';
+import { setFullName, updateInternshipDates } from './users';
+import { acknowledgePrivacyNotice } from './privacy';
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -179,6 +181,49 @@ export async function updatePassword(password: string) {
   });
 
   return { success: true };
+}
+
+/**
+ * Which extra fields the Accept Invitation form needs to show -- interns additionally
+ * collect internship dates and the privacy notice acknowledgement (FR-25) as part of
+ * onboarding, instead of the separate first-login /privacy-notice interstitial every
+ * other role still goes through.
+ */
+export async function getOnboardingContext(): Promise<{ role: string }> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error('Not authenticated');
+
+  const { data: dbUser, error } = await supabase.from('users').select('role').eq('id', user.id).single();
+  if (error || !dbUser) throw new Error('User record not found');
+
+  return { role: dbUser.role };
+}
+
+const privacyAckSchema = z.literal(true, 'You must acknowledge the privacy notice to continue');
+
+export async function completeOnboarding(input: {
+  fullName: string;
+  password: string;
+  internshipStart?: string;
+  internshipEnd?: string;
+  privacyAcknowledged?: boolean;
+}) {
+  const { role } = await getOnboardingContext();
+
+  await updatePassword(input.password);
+  await setFullName(input.fullName);
+
+  if (role === 'intern') {
+    if (!input.internshipStart || !input.internshipEnd) {
+      throw new Error('Internship start and end dates are required.');
+    }
+    privacyAckSchema.parse(input.privacyAcknowledged === true);
+    await updateInternshipDates(input.internshipStart, input.internshipEnd);
+    await acknowledgePrivacyNotice();
+  }
+
+  return { success: true, role };
 }
 
 export async function login(formData: FormData) {

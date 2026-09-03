@@ -51,6 +51,31 @@ jobs:
     - name: Run tests
       run: npm run test
 
+    # Closes audit gap #14 (docs/09-project-audit.md): Playwright was locked into the
+    # stack (prd-intern-docflow.md §10) but never installed. e2e/accessibility.spec.ts
+    # makes the WCAG scan a standing gate instead of a manual one-off; e2e/smoke.spec.ts
+    # covers the unauthenticated routing/auth-error surface. Local Supabase (started
+    # above) is still running, so the app under test can reach it -- same well-known,
+    # public local-dev demo keys the RLS integration suite already uses (never valid
+    # outside a local Docker instance, safe to inline here).
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Run Playwright (E2E + accessibility)
+      run: npx playwright test
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54331
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+        SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
+    - name: Upload Playwright report
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 7
+
     - name: Stop local Supabase
       if: always()
       run: npx supabase stop

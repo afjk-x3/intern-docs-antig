@@ -21,6 +21,8 @@ export interface ChecklistItem {
   versions: SubmissionVersionRecord[];
   deletionDate?: string | null;
   deletionDaysRemaining?: number | null;
+  /** FR-5: who currently holds an In Review item, printed name preferred over email. */
+  currentHolderName?: string | null;
 }
 
 interface InternChecklistProps {
@@ -29,6 +31,8 @@ interface InternChecklistProps {
   onUploadAction: (formData: FormData) => Promise<{ success?: boolean; error?: string }>;
   onResubmitAction: (formData: FormData) => Promise<{ success?: boolean; error?: string }>;
   onGetDownloadUrlAction?: (submissionId: string) => Promise<{ signedUrl?: string; error?: string; isVerified?: boolean; fileHash?: string }>;
+  /** FR-4: signed download URL for a requirement's optional blank template file. */
+  onGetTemplateUrlAction?: (requirementId: string) => Promise<{ signedUrl?: string; error?: string }>;
 }
 
 export function InternChecklist({
@@ -37,6 +41,7 @@ export function InternChecklist({
   onUploadAction,
   onResubmitAction,
   onGetDownloadUrlAction,
+  onGetTemplateUrlAction,
 }: InternChecklistProps) {
   const [selectedItem, setSelectedItem] = useState<ChecklistItem | null>(null);
   const [modalMode, setModalMode] = useState<'upload' | 'resubmit' | null>(null);
@@ -101,6 +106,21 @@ export function InternChecklist({
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Download failed';
+      setDownloadError(msg);
+    }
+  };
+
+  const handleDownloadTemplate = async (requirementId: string) => {
+    if (!onGetTemplateUrlAction) return;
+    setDownloadError(null);
+    try {
+      const res = await onGetTemplateUrlAction(requirementId);
+      if (res.error) throw new Error(res.error);
+      if (res.signedUrl) {
+        window.open(res.signedUrl, '_blank');
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to download template';
       setDownloadError(msg);
     }
   };
@@ -247,12 +267,23 @@ export function InternChecklist({
                   <div className="flex items-center gap-3">
                     <h3 className="text-base font-bold text-text-primary">{req.name}</h3>
                     <StatusBadge state={item.state} isOverdue={item.isOverdue} />
+                    {item.state === 'IN_REVIEW' && item.currentHolderName && (
+                      <span className="text-[11px] text-text-muted">
+                        with <span className="font-semibold text-text-primary">{item.currentHolderName}</span>
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-text-muted line-clamp-2">{req.description}</p>
                 </div>
 
                 {/* Right Action / Details */}
                 <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                  {req.template_url && (
+                    <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate(req.id)}>
+                      Download Template
+                    </Button>
+                  )}
+
                   {item.state === 'NOT_STARTED' && (
                     <Button size="sm" onClick={() => openUploadModal(item)}>
                       Upload File
@@ -377,11 +408,11 @@ export function InternChecklist({
                           <span className="font-sans font-semibold text-emerald-800">
                             {appr.step ? `Step ${appr.step}:` : `Step ${idx + 1}:`}
                           </span>
-                          <span>{appr.users?.email || (appr.step === 2 ? 'admin@makerspace.com' : 'supervisor@makerspace.com')}</span>
+                          <span>{appr.users?.full_name || appr.users?.email || (appr.step === 2 ? 'admin@makerspace.com' : 'supervisor@makerspace.com')}</span>
                         </span>
                       ))
                     ) : (
-                      <span className="font-mono text-emerald-900">{latestAppr.users?.email || 'Authorized Signatory'}</span>
+                      <span className="font-mono text-emerald-900">{latestAppr.users?.full_name || latestAppr.users?.email || 'Authorized Signatory'}</span>
                     )}
                   </div>
                 </div>

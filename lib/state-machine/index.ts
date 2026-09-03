@@ -29,6 +29,7 @@ export type Action =
   | 'REASSIGN'
   | 'CANCEL'
   | 'EXPIRE'
+  | 'REOPEN'
   | 'PURGE';
 
 export type TransitionRule = {
@@ -66,6 +67,13 @@ export const StateMachine: Record<SubmissionState, Partial<Record<Action, Transi
   },
   [SubmissionState.EXPIRED]: {
     PURGE: { to: SubmissionState.PURGED, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
+    // Appendix A: "Admin may reopen." Goes back to IN_REVIEW rather than a state-specific
+    // target, because EXPIRE (see lib/jobs/retention-sweep.ts) only ever changes `state` --
+    // current_step/current_holder_id are left exactly as they were, so reopening into
+    // IN_REVIEW puts it back in front of whoever already held it (or, if it expired before
+    // ever being assigned, current_holder_id is still null, which the approver queue
+    // already treats as visible to any approver -- same as a freshly submitted item).
+    REOPEN: { to: SubmissionState.IN_REVIEW, allowedRoles: [UserRole.ADMIN, UserRole.SYSTEM_ADMIN] },
   },
   [SubmissionState.PURGED]: {},
 };

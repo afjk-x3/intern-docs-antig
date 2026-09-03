@@ -5,6 +5,7 @@ import { createClient } from '../supabase/server';
 export interface DashboardIntern {
   id: string;
   email: string;
+  full_name: string | null;
   internship_start: string | null;
   internship_end: string | null;
   school: string | null;
@@ -23,8 +24,15 @@ export interface DashboardSubmission {
   state: string;
   current_holder_id: string | null;
   current_holder_email?: string | null;
+  current_holder_name?: string | null;
   due_date: string | null;
   isOverdue: boolean;
+  /** FR-21: submitted date is when the submission record was first created. */
+  submitted_at: string | null;
+  /** FR-21: approved date, from the latest (final) approval, when the state is APPROVED. */
+  approved_at: string | null;
+  approver_email?: string | null;
+  approver_name?: string | null;
 }
 
 export interface AdminDashboardData {
@@ -48,7 +56,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   // Fetch interns
   const { data: interns, error: internsError } = await adminClient
     .from('users')
-    .select('id, email, internship_start, internship_end, school, batch')
+    .select('id, email, full_name, internship_start, internship_end, school, batch')
     .eq('role', 'intern')
     .order('email');
 
@@ -62,7 +70,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   if (reqError) throw new Error(`Failed to load requirements: ${reqError.message}`);
 
-  // Fetch submissions (optimized for matrix)
+  // Fetch submissions (optimized for matrix + FR-21 export)
   const { data: submissions, error: subError } = await adminClient
     .from('submissions')
     .select(`
@@ -72,25 +80,50 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       state,
       current_holder_id,
       due_date,
-      users!submissions_current_holder_id_fkey(email)
+      created_at,
+      users!submissions_current_holder_id_fkey(email, full_name),
+      approvals(step, created_at, users(email, full_name))
     `);
 
   if (subError) throw new Error(`Failed to load submissions: ${subError.message}`);
 
+  interface RawSubmissionRow {
+    id: string;
+    intern_id: string;
+    requirement_id: string;
+    state: string;
+    current_holder_id: string | null;
+    due_date: string | null;
+    created_at: string;
+    users?: { email?: string; full_name?: string | null } | null;
+    approvals?: Array<{ step: number; created_at: string; users?: { email?: string; full_name?: string | null } | null }>;
+  }
+
   const now = new Date();
-  const formattedSubmissions = submissions.map(sub => ({
-    id: sub.id,
-    intern_id: sub.intern_id,
-    requirement_id: sub.requirement_id,
-    state: sub.state,
-    current_holder_id: sub.current_holder_id,
-    // @ts-expect-error nested field mapping
-    current_holder_email: sub.users?.email || null,
-    due_date: sub.due_date,
-    isOverdue: sub.due_date
-      ? new Date(sub.due_date).getTime() < now.getTime() && sub.state !== 'APPROVED' && sub.state !== 'PURGED'
-      : false,
-  }));
+  const typedSubmissions = (submissions || []) as unknown as RawSubmissionRow[];
+  const formattedSubmissions = typedSubmissions.map(sub => {
+    const holder = sub.users;
+    const approvals = sub.approvals || [];
+    const latestApproval = [...approvals].sort((a, b) => b.step - a.step)[0] || null;
+
+    return {
+      id: sub.id,
+      intern_id: sub.intern_id,
+      requirement_id: sub.requirement_id,
+      state: sub.state,
+      current_holder_id: sub.current_holder_id,
+      current_holder_email: holder?.email || null,
+      current_holder_name: holder?.full_name || null,
+      due_date: sub.due_date,
+      isOverdue: sub.due_date
+        ? new Date(sub.due_date).getTime() < now.getTime() && sub.state !== 'APPROVED' && sub.state !== 'PURGED'
+        : false,
+      submitted_at: sub.created_at,
+      approved_at: sub.state === 'APPROVED' && latestApproval ? latestApproval.created_at : null,
+      approver_email: sub.state === 'APPROVED' ? latestApproval?.users?.email || null : null,
+      approver_name: sub.state === 'APPROVED' ? latestApproval?.users?.full_name || null : null,
+    };
+  });
 
   const result = {
     interns: interns as DashboardIntern[],

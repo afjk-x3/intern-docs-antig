@@ -30,6 +30,7 @@ interface Requirement {
   due_date_value: string;
   routing_template_id?: string | null;
   version_number: number;
+  template_url?: string | null;
   routing_templates?: {
     id: string;
     name: string;
@@ -49,14 +50,18 @@ interface AdminRequirementManagerProps {
   requirements: Requirement[];
   routingTemplates: RoutingTemplate[];
   onCreateRequirement: (data: CreateRequirementInput) => Promise<{ success?: boolean; error?: string }>;
+  onUploadTemplate: (requirementId: string, formData: FormData) => Promise<{ success?: boolean; error?: string }>;
 }
 
 export function AdminRequirementManager({
   requirements,
   routingTemplates,
   onCreateRequirement,
+  onUploadTemplate,
 }: AdminRequirementManagerProps) {
   const [showReqModal, setShowReqModal] = useState(false);
+  const [templateUploadingId, setTemplateUploadingId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<Record<string, string>>({});
 
   // Requirement form state
   const [name, setName] = useState('');
@@ -102,6 +107,27 @@ export function AdminRequirementManager({
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleTemplateFileChange = async (requirementId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setTemplateError((prev) => ({ ...prev, [requirementId]: '' }));
+    setTemplateUploadingId(requirementId);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const res = await onUploadTemplate(requirementId, formData);
+      if (res.error) throw new Error(res.error);
+      window.location.reload();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload template';
+      setTemplateError((prev) => ({ ...prev, [requirementId]: msg }));
+    } finally {
+      setTemplateUploadingId(null);
+      e.target.value = '';
     }
   };
 
@@ -153,6 +179,28 @@ export function AdminRequirementManager({
                 </span>
               </div>
             </div>
+
+            {/* FR-4: optional blank template file interns can download before filling it out */}
+            <div className="pt-2 border-t border-border-default/60 flex items-center justify-between gap-2 text-[11px]">
+              <span className={req.template_url ? 'text-emerald-700 font-semibold' : 'text-text-muted'}>
+                {req.template_url ? '✓ Template file attached' : 'No template file'}
+              </span>
+              <label className="cursor-pointer">
+                <span className="text-brand-primary font-semibold hover:underline">
+                  {templateUploadingId === req.id ? 'Uploading…' : req.template_url ? 'Replace' : 'Upload Template'}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  className="hidden"
+                  disabled={templateUploadingId === req.id}
+                  onChange={(e) => handleTemplateFileChange(req.id, e)}
+                />
+              </label>
+            </div>
+            {templateError[req.id] && (
+              <p role="alert" className="text-[11px] text-rose-700">{templateError[req.id]}</p>
+            )}
           </div>
         ))}
       </div>

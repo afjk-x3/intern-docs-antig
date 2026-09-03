@@ -1,6 +1,8 @@
 import { getOwnSignaturePreviewUrl, enrollSignature } from '@lib/data/signatures';
+import { getOwnFullName, setFullName } from '@lib/data/users';
 import { createClient } from '@lib/supabase/server';
 import { SignaturePad } from '@/components/SignaturePad';
+import { PrintedNameForm } from '@/components/PrintedNameForm';
 import { redirect } from 'next/navigation';
 
 export default async function ApproverSignaturePage() {
@@ -11,7 +13,10 @@ export default async function ApproverSignaturePage() {
     redirect('/login');
   }
 
-  const signatureStatus = await getOwnSignaturePreviewUrl();
+  const [signatureStatus, currentFullName] = await Promise.all([
+    getOwnSignaturePreviewUrl(),
+    getOwnFullName(),
+  ]);
 
   async function handleSave(formData: FormData) {
     'use server';
@@ -20,6 +25,17 @@ export default async function ApproverSignaturePage() {
       return { success: true };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to save signature';
+      return { error: msg };
+    }
+  }
+
+  async function handleSaveName(fullName: string) {
+    'use server';
+    try {
+      await setFullName(fullName);
+      return { success: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save printed name';
       return { error: msg };
     }
   }
@@ -35,6 +51,11 @@ export default async function ApproverSignaturePage() {
             </div>
           </div>
         </div>
+
+        <PrintedNameForm
+          currentName={currentFullName}
+          onSaveNameAction={handleSaveName}
+        />
 
         <SignaturePad
           currentSignatureUrl={signatureStatus.previewUrl}
