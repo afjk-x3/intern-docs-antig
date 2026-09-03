@@ -25,7 +25,7 @@ export default async function RootPage() {
   // Fetch user role, cohort metadata, dates, and privacy notice acknowledgement
   const { data: userData } = await supabase
     .from('users')
-    .select('role, school, batch, internship_start, internship_end, privacy_acknowledged_at')
+    .select('role, full_name, school, batch, internship_start, internship_end, privacy_acknowledged_at')
     .eq('id', user.id)
     .single();
 
@@ -39,7 +39,7 @@ export default async function RootPage() {
   if (role === 'admin') redirect('/admin');
   if (role === 'approver') redirect('/approver');
   if (role === 'intern') {
-    if (!userData?.school || !userData?.batch || !userData?.internship_start || !userData?.internship_end) {
+    if (!userData?.full_name || !userData?.school || !userData?.batch || !userData?.internship_start || !userData?.internship_end) {
       redirect('/onboarding');
     }
     redirect('/intern');
