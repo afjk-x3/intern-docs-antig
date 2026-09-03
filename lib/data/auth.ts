@@ -21,7 +21,13 @@ async function getAcceptInviteUrl(): Promise<string> {
   const reqHeaders = await headers();
   const host = reqHeaders.get('x-forwarded-host') || reqHeaders.get('host') || 'localhost:3000';
   const proto = reqHeaders.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
-  return `${proto}://${host}/auth/callback?next=/accept-invite`;
+  // Points directly at /accept-invite rather than /auth/callback: Supabase's invite-email
+  // confirmation link (both inviteUserByEmail and the generateLink fallbacks below) delivers
+  // the session as a #access_token=... hash fragment, which servers can't read. Routing it
+  // through /auth/callback first meant that route's code/token_hash-only logic always fell
+  // through to its "invalid or expired" branch before the client-side hash parsing in
+  // AcceptInvitePage ever ran. That page already handles hash tokens, token_hash, and code.
+  return `${proto}://${host}/accept-invite`;
 }
 
 export async function inviteUser(email: string, role: string, school?: string, batch?: string) {

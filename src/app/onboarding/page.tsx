@@ -34,13 +34,22 @@ export default async function OnboardingPage({
     const start = (formData.get('start') as string) || '';
     const end = (formData.get('end') as string) || '';
 
+    // redirect() must not be called inside this try -- it works by throwing a special
+    // NEXT_REDIRECT error that Next.js's own framework code catches further up the
+    // stack, so a catch block here intercepts it first and mistakes it for a real
+    // failure. src/app/privacy-notice/page.tsx's handleAcknowledge already gets this
+    // right (its success redirect sits after the try/catch) -- mirrored here.
+    let saveError: string | null = null;
     try {
       await completeInternOnboarding(school, batch, start, end);
-      redirect('/');
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to save onboarding details';
-      redirect(`/onboarding?error=${encodeURIComponent(msg)}`);
+      saveError = e instanceof Error ? e.message : 'Failed to save onboarding details';
     }
+
+    if (saveError) {
+      redirect(`/onboarding?error=${encodeURIComponent(saveError)}`);
+    }
+    redirect('/');
   }
 
   return (
