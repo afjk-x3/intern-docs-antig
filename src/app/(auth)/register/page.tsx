@@ -31,7 +31,7 @@ export default async function RegisterPage({
       {/* ─── Left brand panel (visible md+) ─── */}
       <div
         className="
-          hidden md:flex md:w-[42%] lg:w-[38%]
+          hidden md:flex md:w-[44%] lg:w-[42%]
           relative overflow-hidden
           flex-col justify-between
           bg-brand-primary text-white
@@ -62,7 +62,7 @@ export default async function RegisterPage({
           <h1 className="text-4xl lg:text-[3.25rem] font-extrabold leading-[1.08] tracking-tight">
             Start your
             <br />
-            <span className="text-brand-accent">journey.</span>
+            <span className="text-brand-accent-on-dark">journey.</span>
           </h1>
           <p className="mt-5 text-[15px] text-white/55 leading-relaxed max-w-xs">
             Join the Makerspace InnovHub cohort. Register your credentials and OJT duration to get started.

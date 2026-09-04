@@ -32,7 +32,7 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
         >
           <p className="font-semibold">Registration Pending Approval</p>
           <p className="text-amber-800/90">
-            Your account is awaiting administrator review. An email notification will be sent once you are admitted to the cohort.
+            Your account is awaiting administrator approval. An email notification will be sent once you are admitted to the cohort.
           </p>
         </div>
       )}
