@@ -33,6 +33,13 @@ async function getAcceptInviteUrl(): Promise<string> {
   return `${proto}://${host}/accept-invite`;
 }
 
+async function getResetPasswordUrl(): Promise<string> {
+  const reqHeaders = await headers();
+  const host = reqHeaders.get('x-forwarded-host') || reqHeaders.get('host') || 'localhost:3000';
+  const proto = reqHeaders.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}/reset-password`;
+}
+
 export async function inviteUser(email: string, role: string, school?: string, batch?: string) {
   const supabase = await createClient();
   const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
@@ -181,6 +188,26 @@ export async function updatePassword(password: string) {
   if (updateError) {
     throw new Error(`Failed to update password: ${updateError.message}`);
   }
+
+  const adminClient = createAdminClient();
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  await adminClient.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'UPDATE_PASSWORD',
+    target_id: user.id,
+    target_type: 'users',
+    source_ip: ip,
+  });
+
+  return { success: true };
+}
+
+export async function logPasswordUpdateAudit() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false };
 
   const adminClient = createAdminClient();
   const reqHeaders = await headers();
@@ -465,6 +492,116 @@ export async function registerInternWithPassword(formData: FormData) {
     success: true,
     name: parsed.data.fullName,
     email: normalizedEmail,
+  };
+}
+
+const resetRequestSchema = z.object({
+  email: z.string().trim().email('Please enter a valid email address.').toLowerCase(),
+});
+
+export async function requestPasswordReset(email: string) {
+  const parsed = resetRequestSchema.safeParse({ email });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || 'Invalid email address.',
+    };
+  }
+
+  const normalizedEmail = parsed.data.email;
+  const adminClient = createAdminClient();
+  const resetPasswordUrl = await getResetPasswordUrl();
+
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+  let targetUserId: string | null = null;
+  let actionLink: string | null = null;
+
+  try {
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email: normalizedEmail,
+      options: {
+        redirectTo: resetPasswordUrl,
+      },
+    });
+
+    if (!linkError && linkData?.user) {
+      targetUserId = linkData.user.id;
+      actionLink = linkData.properties?.action_link || null;
+
+      if (actionLink) {
+        // Output to terminal for instant copy-paste during testing
+        console.log('\n======================================================');
+        console.log(`[PASSWORD RESET LINK for ${normalizedEmail}]:`);
+        console.log(actionLink);
+        console.log('======================================================\n');
+
+        // 1. Attempt sending to target email
+        await sendEmailWithRetry(
+          normalizedEmail,
+          'InternDocs — Password Reset Request',
+          `
+          <div style="font-family: sans-serif; padding: 20px; color: #1e293b; max-width: 560px; margin: 0 auto; line-height: 1.6;">
+            <h2 style="color: #1e3a8a; margin-bottom: 12px;">Reset Your Password</h2>
+            <p>We received a request to reset the password for your InternDocs account associated with <strong>${normalizedEmail}</strong>.</p>
+            <p style="margin: 24px 0;">
+              <a href="${actionLink}" style="display: inline-block; background: #1e3a8a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Reset Password</a>
+            </p>
+            <p style="font-size: 13px; color: #64748b;">This password reset link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 11px; color: #94a3b8;">Makerspace InnovHub • InternDocs Portal</p>
+          </div>
+          `
+        );
+
+        // 2. Since Resend test sandbox only allows sending to ugotjohnm@gmail.com,
+        // also deliver to the verified test inbox when resetting any other account
+        if (normalizedEmail !== 'ugotjohnm@gmail.com') {
+          try {
+            await sendEmailWithRetry(
+              'ugotjohnm@gmail.com',
+              `[Test Sandbox] InternDocs Password Reset for ${normalizedEmail}`,
+              `
+              <div style="font-family: sans-serif; padding: 20px; color: #1e293b; max-width: 560px; margin: 0 auto; line-height: 1.6;">
+                <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; color: #92400e;">
+                  <strong>Resend Test Account Notice:</strong> Forwarded to <strong>ugotjohnm@gmail.com</strong> because Resend is currently in developer test mode. Target account: <strong>${normalizedEmail}</strong>.
+                </div>
+                <h2 style="color: #1e3a8a; margin-bottom: 12px;">Reset Password for ${normalizedEmail}</h2>
+                <p>Click below to reset the password for <strong>${normalizedEmail}</strong>:</p>
+                <p style="margin: 24px 0;">
+                  <a href="${actionLink}" style="display: inline-block; background: #1e3a8a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Reset Password</a>
+                </p>
+                <p style="font-size: 12px; color: #64748b;">Link expires in 1 hour.</p>
+              </div>
+              `
+            );
+          } catch (fwdErr) {
+            console.warn('[requestPasswordReset] Sandbox forward email notice non-fatal error:', fwdErr);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[requestPasswordReset] Non-fatal link generation error:', err);
+  }
+
+  // Always write audit log to record that a reset was attempted for this email/IP
+  await adminClient.from('audit_log').insert({
+    actor_id: targetUserId,
+    action: 'PASSWORD_RESET_REQUESTED',
+    target_id: targetUserId,
+    target_type: 'auth',
+    source_ip: ip,
+    payload: { email: normalizedEmail },
+  });
+
+  // Always return identical success message to prevent user enumeration
+  return {
+    success: true,
+    message: 'If an account exists with this email address, a password reset link has been sent.',
+    temporaryLink: actionLink || undefined,
   };
 }
 

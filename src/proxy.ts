@@ -71,15 +71,17 @@ export async function proxy(request: NextRequest) {
   const isLoginPage = pathname.startsWith('/login');
   const isRegisterPage = pathname.startsWith('/register');
   const isAcceptInvite = pathname.startsWith('/accept-invite');
+  const isForgotPassword = pathname.startsWith('/forgot-password');
+  const isResetPassword = pathname.startsWith('/reset-password');
 
   // Allow all /auth routes unconditionally (callback code exchange, signout, OTP verification)
   if (isAuthCallback) {
     return supabaseResponse;
   }
 
-  // Unauthenticated users can access /login, /register, and /accept-invite
+  // Unauthenticated users can access /login, /register, /accept-invite, /forgot-password, and /reset-password
   if (!user) {
-    if (isLoginPage || isRegisterPage || isAcceptInvite) {
+    if (isLoginPage || isRegisterPage || isAcceptInvite || isForgotPassword || isResetPassword) {
       return supabaseResponse;
     }
     const redirectUrl = request.nextUrl.clone();
@@ -87,14 +89,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Authenticated users visiting /login or /register should be sent to their dashboard
-  if (isLoginPage || isRegisterPage) {
+  // Authenticated users visiting /login, /register, or /forgot-password should be sent to their dashboard
+  if (isLoginPage || isRegisterPage || isForgotPassword) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/';
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Authenticated users on /accept-invite can stay to set their password
+  // Authenticated users on /accept-invite or /reset-password can stay to set their password
   return supabaseResponse;
 }
 

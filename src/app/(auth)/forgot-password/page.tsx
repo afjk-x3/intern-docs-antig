@@ -1,43 +1,27 @@
-import { login } from '@lib/data/auth';
-import { redirect } from 'next/navigation';
-import { LoginForm } from '@/components/LoginForm';
+import { requestPasswordReset } from '@lib/data/auth';
+import { ForgotPasswordForm } from '@/components/ForgotPasswordForm';
 import { Logo } from '@/components/Logo';
 
 export const metadata = {
-  title: 'Sign In — InternDocs',
-  description: 'Sign in to your InternDocs account to manage internship documents and requirements.',
+  title: 'Forgot Password — InternDocs',
+  description: 'Request a password reset link to regain access to your InternDocs account.',
 };
 
-export default async function LoginPage({
+export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; reason?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const error = resolvedSearchParams.error;
-  const reason = resolvedSearchParams.reason;
-  const reset = resolvedSearchParams.reset;
 
-  async function handleLogin(formData: FormData) {
+  async function handleRequestReset(email: string) {
     'use server';
-    let isSuccess = false;
     try {
-      const result = await login(formData);
-      if (!result.success) {
-        if (result.isPendingApproval) {
-          redirect('/login?reason=pending_approval');
-        }
-        throw new Error(result.error);
-      }
-      isSuccess = true;
+      return await requestPasswordReset(email);
     } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'NEXT_REDIRECT') throw e;
-      const msg = e instanceof Error ? e.message : 'Login failed';
-      redirect(`/login?error=${encodeURIComponent(msg)}`);
-    }
-
-    if (isSuccess) {
-      redirect('/');
+      const msg = e instanceof Error ? e.message : 'Failed to request password reset.';
+      return { success: false, error: msg };
     }
   }
 
@@ -53,17 +37,13 @@ export default async function LoginPage({
           p-10 lg:p-14
         "
       >
-        {/* Decorative geometric shapes echoing the logo's swirl motif */}
+        {/* Decorative geometric shapes */}
         <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-          {/* Large swirl-inspired ring — top right, clipped */}
           <div className="absolute -top-28 -right-28 w-72 h-72 rounded-full border-2 border-brand-accent/15" />
           <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full border border-brand-accent/10" />
-          {/* Smaller accent ring — bottom left */}
           <div className="absolute -bottom-20 -left-20 w-56 h-56 rounded-full border-2 border-white/[0.06]" />
           <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-brand-accent/[0.06]" />
-          {/* Horizontal gradient line */}
           <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-brand-accent/20 via-white/5 to-transparent" />
-          {/* Subtle dot grid */}
           <svg className="absolute top-1/3 left-8 opacity-[0.04]" width="120" height="120" viewBox="0 0 120 120" fill="white">
             {Array.from({ length: 36 }).map((_, i) => (
               <circle key={i} cx={10 + (i % 6) * 20} cy={10 + Math.floor(i / 6) * 20} r="2" />
@@ -79,12 +59,12 @@ export default async function LoginPage({
         {/* Center — hero text */}
         <div className="relative z-10 -mt-8">
           <h1 className="text-4xl lg:text-[3.25rem] font-extrabold leading-[1.08] tracking-tight">
-            Welcome
+            Reset
             <br />
-            <span className="text-brand-accent-on-dark">back.</span>
+            <span className="text-brand-accent-on-dark">access.</span>
           </h1>
           <p className="mt-5 text-[15px] text-white/55 leading-relaxed max-w-xs">
-            Track your internship requirements, upload documents, and stay on top of deadlines — all in one place.
+            Quickly recover your account and get back to tracking requirements and uploading submissions.
           </p>
         </div>
 
@@ -103,30 +83,28 @@ export default async function LoginPage({
         <div className="md:hidden mb-10">
           <Logo markClassName="h-11 w-11" textClassName="text-2xl" className="mb-6" />
           <h1 className="text-3xl font-extrabold text-text-primary tracking-tight leading-tight">
-            Welcome <span className="text-brand-accent">back.</span>
+            Reset <span className="text-brand-accent">access.</span>
           </h1>
           <p className="mt-2 text-sm text-text-muted">
-            Sign in to continue to your dashboard.
+            Enter your email to receive recovery instructions.
           </p>
         </div>
 
         {/* Desktop subheading */}
         <div className="hidden md:block mb-8">
           <h2 className="text-2xl font-bold text-text-primary tracking-tight">
-            Sign in to your account
+            Recover your account
           </h2>
           <p className="mt-1.5 text-sm text-text-muted">
-            Enter your credentials to continue.
+            Enter your email address and we&apos;ll send you a password reset link.
           </p>
         </div>
 
         {/* Form container */}
         <div className="w-full max-w-sm">
-          <LoginForm
-            error={error}
-            reason={reason}
-            reset={reset}
-            onLoginAction={handleLogin}
+          <ForgotPasswordForm
+            initialError={error}
+            onRequestReset={handleRequestReset}
           />
 
           {/* Bottom accent line on mobile */}

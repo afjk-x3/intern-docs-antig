@@ -7,7 +7,8 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type') as 'invite' | 'recovery' | 'email' | 'signup' | null;
-  const next = searchParams.get('next') ?? '/accept-invite';
+  const defaultNext = type === 'recovery' ? '/reset-password' : '/accept-invite';
+  const next = searchParams.get('next') ?? defaultNext;
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -47,5 +48,8 @@ export async function GET(request: Request) {
   }
 
   // return the user to an error page with instructions
+  if (type === 'recovery') {
+    return NextResponse.redirect(`${origin}/forgot-password?error=Invalid+or+expired+password+reset+link`);
+  }
   return NextResponse.redirect(`${origin}/login?error=Invalid+or+expired+invite+link`);
 }

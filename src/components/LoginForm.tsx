@@ -1,19 +1,47 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 interface LoginFormProps {
   error?: string | null;
   reason?: string | null;
+  reset?: string | null;
   onLoginAction: (formData: FormData) => void;
 }
 
-export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
+export function LoginForm({ error, reason, reset, onLoginAction }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={onLoginAction} className="space-y-5">
+      {/* Password reset success notice */}
+      {reset === 'success' && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-xs text-emerald-900 border border-emerald-200 leading-relaxed"
+        >
+          <svg
+            className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span className="flex-1 font-medium">
+            Your password has been reset successfully. Please sign in with your new password.
+          </span>
+        </div>
+      )}
+
       {/* Session timeout notice */}
       {reason === 'timeout' && (
         <div
@@ -140,8 +168,8 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
             Remember me
           </span>
         </label>
-        <a
-          href="/login"
+        <Link
+          href="/forgot-password"
           className="
             text-sm font-medium text-brand-primary
             hover:text-brand-primary-hover hover:underline
@@ -150,7 +178,7 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
           "
         >
           Forgot password?
-        </a>
+        </Link>
       </div>
 
       {/* Submit button */}
