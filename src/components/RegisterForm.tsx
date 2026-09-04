@@ -10,6 +10,35 @@ interface RegisterFormProps {
   ) => Promise<{ success?: boolean; error?: string; name?: string; email?: string }>;
 }
 
+// Standard PH OJT requirement: 486 total hours, worked on weekdays only at 9 hrs/day
+// (inclusive of the lunch/dinner break) -- used to pre-fill End of OJT from today's
+// default Start of OJT.
+const TOTAL_OJT_HOURS = 486;
+const HOURS_PER_WORKDAY = 9;
+const REQUIRED_WEEKDAYS = Math.ceil(TOTAL_OJT_HOURS / HOURS_PER_WORKDAY);
+
+// Local (not UTC) YYYY-MM-DD, matching what a <input type="date"> picker shows for "today".
+function toDateInputValue(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// The date of the Nth weekday counting forward from `start` (start itself counts as
+// day 1 if it's a weekday; weekends are skipped and don't advance the count).
+function addWorkWeekdays(start: Date, weekdayCount: number): Date {
+  const result = new Date(start);
+  let weekdaysCounted = 0;
+  while (weekdaysCounted < weekdayCount) {
+    const dayOfWeek = result.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) weekdaysCounted++;
+    if (weekdaysCounted === weekdayCount) break;
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
 export function RegisterForm({ error: initialError, onRegisterAction }: RegisterFormProps) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,9 +47,9 @@ export function RegisterForm({ error: initialError, onRegisterAction }: Register
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [school, setSchool] = useState('');
-  const [batch, setBatch] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  const [batch, setBatch] = useState(() => String(new Date().getFullYear()));
+  const [start, setStart] = useState(() => toDateInputValue(new Date()));
+  const [end, setEnd] = useState(() => toDateInputValue(addWorkWeekdays(new Date(), REQUIRED_WEEKDAYS)));
 
   const [clientError, setClientError] = useState<string | null>(initialError || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,8 +69,8 @@ export function RegisterForm({ error: initialError, onRegisterAction }: Register
       return;
     }
 
-    if (!/^\d+$/.test(batch.trim())) {
-      setClientError('Batch year must contain numbers only.');
+    if (!/^\d{4}$/.test(batch.trim())) {
+      setClientError('Batch year must be a 4-digit year (e.g. 2026).');
       return;
     }
 
@@ -235,12 +264,13 @@ export function RegisterForm({ error: initialError, onRegisterAction }: Register
             <input
               id="register-batch"
               name="batch"
-              type="number"
+              type="text"
               inputMode="numeric"
-              min="1"
+              pattern="\d{4}"
+              maxLength={4}
               required
               value={batch}
-              onChange={(e) => setBatch(e.target.value)}
+              onChange={(e) => setBatch(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="e.g. 2026"
               className="w-full rounded-xl border border-border-default bg-white px-3.5 py-2.5 text-xs text-text-primary placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 focus:outline-none transition-all"
             />

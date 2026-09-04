@@ -45,7 +45,7 @@ vi.mock('../lib/supabase/admin', () => ({
                   email: 'intern@up.edu.ph',
                   full_name: 'Maria Santos',
                   school: 'University of the Philippines',
-                  batch: '5',
+                  batch: '2026',
                 },
                 error: null,
               }),
@@ -99,33 +99,22 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
       password: 'SecurePassword123!',
       confirmPassword: 'SecurePassword123!',
       school: 'University of the Philippines',
-      batch: '5',
+      batch: '2026',
       start: '2026-09-01',
       end: '2026-12-01',
     };
 
-    it('accepts valid input with numeric batch number', () => {
+    it('accepts a valid 4-digit batch year', () => {
       const result = internSelfRegistrationSchema.safeParse(validPayload);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.batch).toBe('5');
+        expect(result.data.batch).toBe('2026');
         expect(result.data.fullName).toBe('Juan dela Cruz');
       }
     });
 
-    it('accepts multi-digit numeric batch number (e.g. 2026)', () => {
-      const result = internSelfRegistrationSchema.safeParse({
-        ...validPayload,
-        batch: '2026',
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.batch).toBe('2026');
-      }
-    });
-
-    it('rejects non-numeric batch numbers (letters or symbols)', () => {
-      const invalidBatches = ['Batch 5', 'Cohort-A', 'Summer2026', '5A', 'B5'];
+    it('rejects batch years that are not exactly 4 digits', () => {
+      const invalidBatches = ['5', '99', '202', '20266', '123456'];
       for (const batch of invalidBatches) {
         const result = internSelfRegistrationSchema.safeParse({
           ...validPayload,
@@ -133,7 +122,21 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0]?.message).toContain('Batch year must contain numbers only');
+          expect(result.error.issues[0]?.message).toContain('Batch year must be a 4-digit year');
+        }
+      }
+    });
+
+    it('rejects non-numeric batch years (letters or symbols)', () => {
+      const invalidBatches = ['Batch 5', 'Cohort-A', 'Summer2026', '2026A', 'B2026'];
+      for (const batch of invalidBatches) {
+        const result = internSelfRegistrationSchema.safeParse({
+          ...validPayload,
+          batch,
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0]?.message).toContain('Batch year must be a 4-digit year');
         }
       }
     });
@@ -202,7 +205,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
       formData.append('password', 'SecurePassword123!');
       formData.append('confirmPassword', 'SecurePassword123!');
       formData.append('school', 'University of the Philippines');
-      formData.append('batch', '5');
+      formData.append('batch', '2026');
       formData.append('start', '2026-09-01');
       formData.append('end', '2026-12-01');
 
@@ -218,7 +221,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
           user_metadata: expect.objectContaining({
             full_name: 'Juan dela Cruz',
             school: 'University of the Philippines',
-            batch: '5',
+            batch: '2026',
             approved: false,
           }),
         })
@@ -234,7 +237,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
           role: 'intern',
           full_name: 'Juan dela Cruz',
           school: 'University of the Philippines',
-          batch: '5',
+          batch: '2026',
           approved_at: null,
         })
       );
@@ -294,7 +297,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
             user_metadata: {
               full_name: 'Maria Santos',
               school: 'University of the Philippines',
-              batch: '5',
+              batch: '2026',
               approved: false,
             },
           },
