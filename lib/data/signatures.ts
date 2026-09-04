@@ -4,6 +4,7 @@ import { createClient } from '../supabase/server';
 import { createAdminClient } from '../supabase/admin';
 import { detectMagicBytes } from './file-validation';
 import { trimSignatureWhitespace } from '../image/trim-signature';
+import { logPermissionDenied } from './audit';
 import { headers } from 'next/headers';
 
 const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -97,6 +98,7 @@ export async function enrollSignature(formData: FormData) {
     .single();
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'ENROLL_SIGNATURE', targetType: 'users', targetId: user.id });
     throw new Error('Forbidden: Only approvers and administrators can enroll signatures.');
   }
 

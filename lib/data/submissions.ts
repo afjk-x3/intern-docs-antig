@@ -10,6 +10,7 @@ import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { sendEmailWithRetry } from '../email/resend';
 import { emailTemplates } from '../email/templates';
+import { logPermissionDenied } from './audit';
 
 // Helper to fetch emails for user ID or role
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,6 +285,7 @@ export async function getApproverQueue() {
     .single();
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'READ_APPROVER_QUEUE', targetType: 'submissions' });
     throw new Error('Unauthorized');
   }
 
@@ -402,6 +404,13 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
 
   // Authorization check (FR-2, FR-26)
   if (role === 'intern' && typedSub.intern_id !== user.id) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'READ_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+      reason: 'intern requested another intern\'s submission',
+    });
     throw new Error('Forbidden: You cannot access another intern\'s submission');
   }
 
@@ -410,6 +419,13 @@ export async function getSubmissionDetails(submissionId: string): Promise<Submis
     const steps = getRoutingSteps(typedSub);
     const stepConfig = steps.find((s) => s.step === currentStep);
     if (!stepConfig || (stepConfig.role !== 'approver' && stepConfig.user_id !== user.id)) {
+      await logPermissionDenied({
+        actorId: user.id,
+        attempted: 'READ_SUBMISSION',
+        targetType: 'submissions',
+        targetId: submissionId,
+        reason: 'approver not assigned to the current step and has not acted on it',
+      });
       throw new Error('Forbidden: This submission is not assigned to your review');
     }
   }
@@ -656,6 +672,13 @@ export async function resubmitSubmission(formData: FormData) {
   const typedSub = submission as unknown as SubmissionWithRelations;
 
   if (typedSub.intern_id !== user.id) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'RESUBMIT_DOCUMENT',
+      targetType: 'submissions',
+      targetId: typedSub.id,
+      reason: 'resubmit attempted against another intern\'s submission',
+    });
     throw new Error('Unauthorized.');
   }
 
@@ -773,6 +796,12 @@ export async function approveSubmissionSigned(submissionId: string) {
   const role = dbUser?.role as UserRole;
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'APPROVE_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+    });
     throw new Error('Unauthorized');
   }
 
@@ -809,6 +838,13 @@ export async function approveSubmissionSigned(submissionId: string) {
 
   // Guard: If current step requires an Administrator, approvers cannot sign/approve it (Admin final decision)
   if (stepRequiredRole === 'admin' && role === UserRole.APPROVER) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'APPROVE_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+      reason: `step ${currentStep} requires an administrator`,
+    });
     throw new Error('Forbidden: This step requires an Administrator to review and grant final approval.');
   }
 
@@ -997,6 +1033,13 @@ export async function reassignApprover(submissionId: string, newApproverId: stri
 
   // FR-15 / Appendix A: only an Administrator may reassign a step.
   if (!dbUser || !['admin', 'system_admin'].includes(role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'REASSIGN_APPROVER',
+      targetType: 'submissions',
+      targetId: submissionId,
+      reason: 'only an administrator may reassign a step (FR-15)',
+    });
     throw new Error('Unauthorized');
   }
 
@@ -1079,6 +1122,12 @@ export async function cancelSubmission(submissionId: string, reason: string) {
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = dbUser?.role as UserRole;
   if (!dbUser || !['admin', 'system_admin'].includes(role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'CANCEL_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+    });
     throw new Error('Unauthorized: Only administrators can cancel a submission.');
   }
 
@@ -1138,6 +1187,12 @@ export async function reopenSubmission(submissionId: string) {
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = dbUser?.role as UserRole;
   if (!dbUser || !['admin', 'system_admin'].includes(role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'REOPEN_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+    });
     throw new Error('Unauthorized: Only administrators can reopen a submission.');
   }
 
@@ -1193,6 +1248,12 @@ export async function returnSubmission(submissionId: string, comment: string) {
   const role = dbUser?.role as UserRole;
 
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'RETURN_SUBMISSION',
+      targetType: 'submissions',
+      targetId: submissionId,
+    });
     throw new Error('Unauthorized');
   }
 
@@ -1347,6 +1408,32 @@ export async function getSubmissionSignedDownloadUrl(submissionId: string, versi
       throw new Error(`Failed to generate signed download URL: ${adminSignedErr?.message}`);
     }
     signedUrl = adminSigned.signedUrl;
+  }
+
+  // FR-17 ("Every download is audit-logged") and FR-24, which lists "download" among the
+  // required events. Only the tamper path above was logged before, so a successful
+  // retrieval left no record of who took a copy of a document -- the exact question a
+  // data-protection dispute turns on. Logged at URL-issue time: that is the moment the
+  // server authorises access, and the only moment it can observe (the fetch itself goes
+  // straight from the browser to storage).
+  {
+    const { data: { user: downloader } } = await supabase.auth.getUser();
+    const reqHeaders = await headers();
+    const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+    await adminClient.from('audit_log').insert({
+      actor_id: downloader?.id ?? null,
+      action: 'DOWNLOAD_DOCUMENT',
+      target_id: submissionId,
+      target_type: 'submissions',
+      source_ip: ip,
+      payload: {
+        file_path: filePathToDownload,
+        file_hash: actualHash,
+        version_id: targetVersion.id,
+        is_signed_output: filePathToDownload === latestApproval?.signed_pdf_url,
+      },
+    });
   }
 
   return {

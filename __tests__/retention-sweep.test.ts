@@ -10,13 +10,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * happened.
  */
 
-const storageRemove = vi.fn(async () => ({ data: [], error: null }));
-const auditInsert = vi.fn(async () => ({ error: null }));
-const notificationsInsert = vi.fn(async () => ({ error: null }));
+type AuditRow = Record<string, unknown>;
 
-const versionsUpdateIn = vi.fn(async () => ({ error: null }));
-const approvalsUpdateIn = vi.fn(async () => ({ error: null }));
-const submissionsUpdateEq = vi.fn(async () => ({ error: null }));
+// Arg types are declared so `mock.calls[0][0]` stays typed under `tsc --noEmit`; vitest
+// itself does not typecheck, so an untyped vi.fn() passes the suite but fails the build.
+// The parameters exist only to carry those types -- the mock bodies ignore them.
+/* eslint-disable @typescript-eslint/no-unused-vars */
+const storageRemove = vi.fn(async (_paths: string[]) => ({ data: [], error: null }));
+const auditInsert = vi.fn(async (_row: AuditRow) => ({ error: null }));
+const notificationsInsert = vi.fn(async (_row: AuditRow) => ({ error: null }));
+
+const versionsUpdateIn = vi.fn(async (_column: string, _ids: string[]) => ({ error: null }));
+const approvalsUpdateIn = vi.fn(async (_column: string, _ids: string[]) => ({ error: null }));
+const submissionsUpdateEq = vi.fn(async (_column: string, _id: string) => ({ error: null }));
 
 let submissionRows: unknown[] = [];
 
@@ -94,7 +100,7 @@ describe('runRetentionSweep — FR-22 file deletion coverage', () => {
     await runRetentionSweep();
 
     expect(storageRemove).toHaveBeenCalledTimes(1);
-    const removedPaths = storageRemove.mock.calls[0][0] as unknown as string[];
+    const removedPaths = storageRemove.mock.calls[0][0];
 
     // The superseded version: previously left behind forever.
     expect(removedPaths).toContain('intern-1/sub-1/v1.pdf');
@@ -152,7 +158,7 @@ describe('runRetentionSweep — FR-22 file deletion coverage', () => {
     await runRetentionSweep();
 
     const purgeEntry = auditInsert.mock.calls
-      .map((c) => c[0] as unknown as Record<string, unknown>)
+      .map((c) => c[0])
       .find((e) => e.action === 'RETENTION_PURGE_EXECUTED');
 
     expect(purgeEntry).toBeDefined();
@@ -186,7 +192,7 @@ describe('runRetentionSweep — FR-22 file deletion coverage', () => {
 
     await runRetentionSweep();
 
-    const removedPaths = storageRemove.mock.calls[0][0] as unknown as string[];
+    const removedPaths = storageRemove.mock.calls[0][0];
     expect(removedPaths).toEqual(expect.arrayContaining(['old-v1.pdf', 'old-signed.pdf']));
     // Already-deleted version is not re-attempted.
     expect(removedPaths).not.toContain('old-v2.pdf');
@@ -194,7 +200,7 @@ describe('runRetentionSweep — FR-22 file deletion coverage', () => {
     expect(submissionsUpdateEq).not.toHaveBeenCalled();
 
     const entry = auditInsert.mock.calls
-      .map((c) => c[0] as unknown as Record<string, unknown>)
+      .map((c) => c[0])
       .find((e) => e.action === 'RETENTION_PURGE_EXECUTED');
     expect((entry!.payload as Record<string, unknown>).leftover_sweep).toBe(true);
   });

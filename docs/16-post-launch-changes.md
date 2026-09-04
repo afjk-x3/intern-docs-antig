@@ -304,3 +304,52 @@ still have orphaned signed PDFs and superseded versions in the `submissions` buc
 first run of the updated job after this migration will sweep them automatically — no manual
 cleanup script is needed — but that first run will delete more objects than a normal day's
 run, which is expected.
+
+### Fix: completed FR-24's required event list, and FR-17 download logging
+
+FR-24 enumerates the events the audit log must hold. Three were absent, found in the same
+2026-09-04 PRD re-verification as the FR-22 gap above:
+
+| Required event | Before | Now |
+|---|---|---|
+| login | only `LOGIN_FAILED` was written | `LOGIN_SUCCEEDED` in `login()` (`lib/data/auth.ts`) |
+| download | only the tamper path (`TAMPER_ALERT_HASH_MISMATCH`) | `DOWNLOAD_DOCUMENT` in `getSubmissionSignedDownloadUrl()` |
+| permission denial | nothing — refused access threw with no trace | `PERMISSION_DENIED` via `logPermissionDenied()` |
+
+The download entry also closes FR-17's "Every download is audit-logged". It is written at
+signed-URL issue time, since that is the moment the server authorises access and the only
+moment it can observe — the fetch itself goes browser-to-storage and never touches the app.
+The payload records the file path, hash, version id, and whether the file was a signed
+output or the raw submitted version.
+
+`logPermissionDenied()` (`lib/data/audit.ts`) is applied at all 23 authorisation-refusal
+sites across the data layer (`submissions`, `users`, `requirements`, `routing`, `signatures`,
+`dashboard`, `auth`, `audit`). It records actor, target, and what was attempted, and it
+**never throws**: an audit-write failure must not turn a clean 403 into a 500, and must
+never be the reason a denial becomes an allow. It complements — does not replace —
+`DENIED_TRANSITION`, which covers illegal state *transitions* rather than refused *access*.
+
+Covered by `__tests__/audit-coverage.test.ts`.
+
+### Fix: CI was red on both lint and typecheck
+
+Discovered while verifying the above. `.github/workflows/ci.yml` runs `npm run lint` and
+`npx tsc --noEmit`; both had been failing since commit `5245ed4`, so no branch pushed after
+that point was actually being gated:
+
+- **12 type errors in `lib/data/audit.ts`.** `new Map(rows.map(r => [r.id, r]))` over an
+  untyped Supabase result infers `Map<any, {}>`, so every `.get()` returned `{}` and each
+  property access failed. Fixed by declaring the four lookup row shapes
+  (`EnrichedUserRow`, `EnrichedRequirementRow`, `EnrichedVersionRow`,
+  `EnrichedSubmissionRow`) and typing the maps. Behaviour is unchanged — this also let
+  three `@typescript-eslint/no-explicit-any` suppressions be removed.
+- **1 type error in `src/app/admin/audit-log/page.tsx`.** It imported `AuditLogEntry` from
+  `@/components/AuditLogTable`, which consumes that type but does not re-export it. Now
+  imported from `@lib/data/audit`, matching `src/app/system-admin/audit-log/page.tsx`.
+- **1 lint error in `src/app/(auth)/accept-invite/page.tsx`.** `urlParams.get('type') as any`
+  was narrowed to the six email OTP types `verifyOtp` accepts, with an unrecognised value
+  falling back to `'invite'` instead of being passed through to fail at runtime.
+
+Also fixed the typing of the mocks in `__tests__/retention-sweep.test.ts` added in the FR-22
+commit: vitest does not typecheck, so an untyped `vi.fn()` passed the suite while failing
+`tsc --noEmit`.

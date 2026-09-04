@@ -36,6 +36,40 @@ export interface AuditLogEntry {
   submission?: AuditLogSubmissionDetails | null;
 }
 
+/**
+ * Shapes of the lookup rows this function joins onto each audit entry. They are declared
+ * because `new Map(rows.map(r => [r.id, r]))` over an untyped Supabase result infers
+ * `Map<any, {}>`, which makes every `.get(...)` return `{}` and fails `tsc --noEmit` on
+ * each property access below (12 errors, which had CI red -- see .github/workflows/ci.yml).
+ */
+interface EnrichedUserRow {
+  id: string;
+  email: string;
+  role?: string;
+}
+
+interface EnrichedRequirementRow {
+  id: string;
+  name: string;
+}
+
+interface EnrichedVersionRow {
+  id: string;
+  version_number: number;
+  file_url: string | null;
+  is_superseded: boolean;
+  created_at: string;
+}
+
+interface EnrichedSubmissionRow {
+  id: string;
+  state: string;
+  intern_id: string;
+  requirements?: { id: string; name: string } | null;
+  users?: { id: string; email: string } | null;
+  submission_versions?: EnrichedVersionRow[];
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function enrichAuditLogs(adminClient: any, rawLogs: any[]): Promise<AuditLogEntry[]> {
   if (!rawLogs || rawLogs.length === 0) return [];
@@ -75,12 +109,15 @@ export async function enrichAuditLogs(adminClient: any, rawLogs: any[]): Promise
       : Promise.resolve({ data: [] }),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const usersMap = new Map((usersRes.data || []).map((u: any) => [u.id, u]));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const submissionsMap = new Map((submissionsRes.data || []).map((s: any) => [s.id, s]));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requirementsMap = new Map((requirementsRes.data || []).map((r: any) => [r.id, r]));
+  const usersMap = new Map<string, EnrichedUserRow>(
+    ((usersRes.data || []) as EnrichedUserRow[]).map((u) => [u.id, u])
+  );
+  const submissionsMap = new Map<string, EnrichedSubmissionRow>(
+    ((submissionsRes.data || []) as EnrichedSubmissionRow[]).map((s) => [s.id, s])
+  );
+  const requirementsMap = new Map<string, EnrichedRequirementRow>(
+    ((requirementsRes.data || []) as EnrichedRequirementRow[]).map((r) => [r.id, r])
+  );
 
   return rawLogs.map((e) => {
     const actorUser = e.actor_id ? usersMap.get(e.actor_id) || null : null;
@@ -92,8 +129,7 @@ export async function enrichAuditLogs(adminClient: any, rawLogs: any[]): Promise
       const sub = submissionsMap.get(e.target_id);
       if (sub) {
         const versions = sub.submission_versions || [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const activeVer = versions.find((v: any) => !v.is_superseded) || versions[0] || null;
+        const activeVer = versions.find((v) => !v.is_superseded) || versions[0] || null;
         submissionDetails = {
           id: sub.id,
           requirement_name: sub.requirements?.name || 'Document Requirement',
@@ -129,6 +165,7 @@ export async function getAuditLogs(options?: { actorId?: string; targetId?: stri
 
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'READ_AUDIT_LOG', targetType: 'audit_log' });
     throw new Error('Forbidden');
   }
 
@@ -154,4 +191,50 @@ export async function getAuditLogs(options?: { actorId?: string; targetId?: stri
   }
 
   return enrichAuditLogs(adminClient, data || []);
+}
+
+/**
+ * Records a refused authorisation attempt.
+ *
+ * FR-24 lists "permission denial" among the events the audit log must hold, alongside the
+ * state-machine's own DENIED_TRANSITION (see validateTransitionAudited in
+ * lib/data/submissions.ts, which covers illegal *transitions* rather than refused *access*).
+ * Without this, a probe against another intern's submission or an admin-only endpoint left
+ * no trace at all -- exactly the reconstruction FR-24 exists to make possible.
+ *
+ * Call immediately before throwing, keeping the caller's own error message intact:
+ *
+ *     await logPermissionDenied({ actorId: user.id, attempted: 'READ_SUBMISSION', ... });
+ *     throw new Error('Forbidden: ...');
+ *
+ * Never throws on its own -- an audit-write failure must not convert a clean 403 into a
+ * 500, and must never be the reason a denial silently becomes an allow.
+ */
+export async function logPermissionDenied(params: {
+  actorId: string | null;
+  attempted: string;
+  targetType: string;
+  targetId?: string | null;
+  reason?: string;
+}): Promise<void> {
+  try {
+    const adminClient = createAdminClient();
+    const { headers } = await import('next/headers');
+    const reqHeaders = await headers();
+    const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+
+    await adminClient.from('audit_log').insert({
+      actor_id: params.actorId,
+      action: 'PERMISSION_DENIED',
+      target_id: params.targetId ?? null,
+      target_type: params.targetType,
+      source_ip: ip,
+      payload: {
+        attempted: params.attempted,
+        ...(params.reason ? { reason: params.reason } : {}),
+      },
+    });
+  } catch (err) {
+    console.error('[audit] Failed to record PERMISSION_DENIED:', err);
+  }
 }

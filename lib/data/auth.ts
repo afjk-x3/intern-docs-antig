@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { headers } from 'next/headers';
 
 import { sendEmailWithRetry } from '../email/resend';
+import { logPermissionDenied } from './audit';
 import { setFullName, updateInternshipDates } from './users';
 import { acknowledgePrivacyNotice } from './privacy';
 
@@ -47,11 +48,18 @@ export async function inviteUser(email: string, role: string, school?: string, b
     .eq('id', currentUser.id)
     .single();
   if (roleError || !currentDbUser || !['admin', 'system_admin'].includes(currentDbUser.role)) {
+    await logPermissionDenied({ actorId: currentUser.id, attempted: 'INVITE_USER', targetType: 'users' });
     throw new Error('Unauthorized');
   }
 
   // Enforce PRD boundary: Admin can ONLY invite interns. Approver & Admin invites require system_admin.
   if (currentDbUser.role === 'admin' && role !== 'intern') {
+    await logPermissionDenied({
+      actorId: currentUser.id,
+      attempted: 'INVITE_USER',
+      targetType: 'users',
+      reason: `admin attempted to invite role '${role}'; only system_admin may invite staff roles`,
+    });
     throw new Error('Forbidden: Administrators can only invite interns. Inviting staff roles requires System Administrator privileges.');
   }
 
@@ -252,7 +260,23 @@ export async function login(formData: FormData) {
     // but we re-wrap to ensure we never confirm email existence
     return { success: false, error: 'Invalid email or password' };
   }
-  
+
+  // FR-24 lists "login" as a required event, not just "failed login". Without this the log
+  // could show who failed to get in but never who actually did -- which is the half that
+  // matters when reconstructing what a given account did during an incident.
+  const adminClient = createAdminClient();
+  const reqHeaders = await headers();
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+  const { data: { user: signedInUser } } = await supabase.auth.getUser();
+
+  await adminClient.from('audit_log').insert({
+    actor_id: signedInUser?.id ?? null,
+    action: 'LOGIN_SUCCEEDED',
+    target_id: signedInUser?.id ?? null,
+    target_type: 'auth',
+    source_ip: ip,
+  });
+
   return { success: true };
 }
 

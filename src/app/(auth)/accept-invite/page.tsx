@@ -59,7 +59,14 @@ export default function AcceptInvitePage() {
 
         // 3. Parse Query Params (PKCE code or OTP token_hash)
         const token_hash = urlParams.get('token_hash') || urlParams.get('token');
-        const type = (urlParams.get('type') as any) || 'invite';
+        // Narrowed to the email OTP types verifyOtp accepts rather than `any`, which was a
+        // lint error and left a bad value (say ?type=sms) to fail at runtime instead.
+        const rawType = urlParams.get('type');
+        const emailOtpTypes = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const;
+        type EmailOtpType = (typeof emailOtpTypes)[number];
+        const type: EmailOtpType = emailOtpTypes.includes(rawType as EmailOtpType)
+          ? (rawType as EmailOtpType)
+          : 'invite';
         const code = urlParams.get('code');
 
         if (token_hash) {
