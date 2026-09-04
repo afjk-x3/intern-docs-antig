@@ -24,6 +24,19 @@ export function LoginForm({ error, reason, onLoginAction }: LoginFormProps) {
         </div>
       )}
 
+      {/* Pending approval notice */}
+      {reason === 'pending_approval' && (
+        <div
+          role="alert"
+          className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-900 border border-amber-200 space-y-1"
+        >
+          <p className="font-semibold">Registration Pending Approval</p>
+          <p className="text-amber-800/90">
+            Your account is awaiting administrator review. An email notification will be sent once you are admitted to the cohort.
+          </p>
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div

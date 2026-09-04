@@ -39,11 +39,8 @@ export default async function RootPage() {
   if (role === 'admin') redirect('/admin');
   if (role === 'approver') redirect('/approver');
   if (role === 'intern') {
-    if (!userData?.full_name || !userData?.school || !userData?.batch || !userData?.internship_start || !userData?.internship_end) {
-      redirect('/onboarding');
-    }
     redirect('/intern');
   }
 
-  redirect('/onboarding');
+  redirect('/login');
 }

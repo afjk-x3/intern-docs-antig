@@ -1,10 +1,10 @@
-import { registerIntern } from '@lib/data/auth';
+import { registerInternWithPassword } from '@lib/data/auth';
 import { RegisterForm } from '@/components/RegisterForm';
 import { Logo } from '@/components/Logo';
 
 export const metadata = {
-  title: 'Register as Intern — InternDocs',
-  description: 'Create your InternDocs account to track requirements, submit DTRs, and manage your internship.',
+  title: 'Intern Registration — InternDocs',
+  description: 'Submit your intern registration and OJT duration to join the Makerspace InnovHub cohort.',
 };
 
 export default async function RegisterPage({
@@ -18,7 +18,7 @@ export default async function RegisterPage({
   async function handleRegister(formData: FormData) {
     'use server';
     try {
-      const result = await registerIntern(formData);
+      const result = await registerInternWithPassword(formData);
       return result;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Registration failed';
@@ -31,7 +31,7 @@ export default async function RegisterPage({
       {/* ─── Left brand panel (visible md+) ─── */}
       <div
         className="
-          hidden md:flex md:w-[44%] lg:w-[42%]
+          hidden md:flex md:w-[42%] lg:w-[38%]
           relative overflow-hidden
           flex-col justify-between
           bg-brand-primary text-white
@@ -65,7 +65,7 @@ export default async function RegisterPage({
             <span className="text-brand-accent">journey.</span>
           </h1>
           <p className="mt-5 text-[15px] text-white/55 leading-relaxed max-w-xs">
-            Join the Makerspace InnovHub cohort. Track your internship requirements and submit signed documents with ease.
+            Join the Makerspace InnovHub cohort. Register your credentials and OJT duration to get started.
           </p>
         </div>
 
@@ -79,30 +79,30 @@ export default async function RegisterPage({
       </div>
 
       {/* ─── Right form panel ─── */}
-      <div className="flex flex-1 flex-col justify-center px-6 sm:px-10 lg:px-20 py-10 bg-surface-muted">
+      <div className="flex flex-1 flex-col justify-center px-6 sm:px-10 lg:px-16 py-10 bg-surface-muted overflow-y-auto">
         {/* Mobile-only brand header */}
-        <div className="md:hidden mb-8">
+        <div className="md:hidden mb-6">
           <Logo markClassName="h-11 w-11" textClassName="text-2xl" className="mb-4" />
           <h1 className="text-3xl font-extrabold text-text-primary tracking-tight leading-tight">
             Start your <span className="text-brand-accent">journey.</span>
           </h1>
           <p className="mt-1.5 text-xs text-text-muted">
-            Enter your email to receive an activation link.
+            Provide your details and internship duration to register.
           </p>
         </div>
 
         {/* Desktop subheading */}
-        <div className="hidden md:block mb-6">
+        <div className="hidden md:block mb-5 max-w-md">
           <h2 className="text-2xl font-bold text-text-primary tracking-tight">
-            Register as an intern
+            Intern Self-Registration
           </h2>
           <p className="mt-1 text-xs text-text-muted">
-            Enter your email to receive an activation link to set your password.
+            Fill in your account details, school, and OJT duration. Your registration will be reviewed by an administrator.
           </p>
         </div>
 
         {/* Form container */}
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-md">
           <RegisterForm
             error={error}
             onRegisterAction={handleRegister}

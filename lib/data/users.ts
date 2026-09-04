@@ -3,6 +3,7 @@ import { createClient } from '../supabase/server';
 import { createAdminClient } from '../supabase/admin';
 import { z } from 'zod';
 import { headers } from 'next/headers';
+import { sendEmailWithRetry } from '../email/resend';
 
 const datesSchema = z.object({
   start: z.string().date(),
@@ -296,6 +297,145 @@ export async function updateUserRole(userId: string, newRole: string) {
     target_id: userId,
     target_type: 'users',
     source_ip: ip,
+  });
+
+  return { success: true };
+}
+
+export interface PendingRegistration {
+  id: string;
+  email: string;
+  fullName: string;
+  school: string;
+  batch: string;
+  internshipStart: string;
+  internshipEnd: string;
+  createdAt: string;
+}
+
+export async function getPendingRegistrations(): Promise<PendingRegistration[]> {
+  const adminClient = createAdminClient();
+  const { data: listData, error } = await adminClient.auth.admin.listUsers();
+  if (error || !listData?.users) return [];
+
+  // Filter users with approved === false
+  const pendingAuthUsers = listData.users.filter(
+    (u) => u.user_metadata?.approved === false
+  );
+
+  if (pendingAuthUsers.length === 0) return [];
+
+  const pendingIds = pendingAuthUsers.map((u) => u.id);
+  const { data: dbUsers } = await adminClient
+    .from('users')
+    .select('id, email, full_name, school, batch, internship_start, internship_end, created_at')
+    .in('id', pendingIds);
+
+  const dbMap = new Map((dbUsers || []).map((u) => [u.id, u]));
+
+  return pendingAuthUsers.map((u) => {
+    const profile = dbMap.get(u.id);
+    return {
+      id: u.id,
+      email: u.email || '',
+      fullName: profile?.full_name || (u.user_metadata?.full_name as string) || 'Unnamed Intern',
+      school: profile?.school || (u.user_metadata?.school as string) || 'N/A',
+      batch: profile?.batch || (u.user_metadata?.batch as string) || 'N/A',
+      internshipStart: profile?.internship_start || (u.user_metadata?.internship_start as string) || '',
+      internshipEnd: profile?.internship_end || (u.user_metadata?.internship_end as string) || '',
+      createdAt: profile?.created_at || u.created_at,
+    };
+  });
+}
+
+export async function approveInternRegistration(targetUserId: string) {
+  const supabase = await createClient();
+  const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !currentUser) throw new Error('Not authenticated');
+
+  const { data: currentDbUser, error: roleError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', currentUser.id)
+    .single();
+
+  if (roleError || !['admin', 'system_admin'].includes(currentDbUser?.role)) {
+    throw new Error('Unauthorized: Only administrators can approve registrations.');
+  }
+
+  const adminClient = createAdminClient();
+  const { data: targetAuthUser, error: targetError } = await adminClient.auth.admin.getUserById(targetUserId);
+  if (targetError || !targetAuthUser.user) {
+    throw new Error('User not found');
+  }
+
+  // Update auth user metadata to approved: true
+  const existingMeta = targetAuthUser.user.user_metadata || {};
+  const { error: updateMetaError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    user_metadata: {
+      ...existingMeta,
+      approved: true,
+    },
+  });
+
+  if (updateMetaError) {
+    throw new Error(`Failed to update approval status: ${updateMetaError.message}`);
+  }
+
+  // Fetch user profile from public.users
+  const { data: profile } = await adminClient
+    .from('users')
+    .select('email, full_name, school, batch')
+    .eq('id', targetUserId)
+    .single();
+
+  const internEmail = profile?.email || targetAuthUser.user.email || '';
+  const internName = profile?.full_name || existingMeta.full_name || 'Intern';
+  const school = profile?.school || existingMeta.school || 'Makerspace';
+  const batch = profile?.batch || existingMeta.batch || '';
+
+  // Get base URL for login
+  const reqHeaders = await headers();
+  const host = reqHeaders.get('x-forwarded-host') || reqHeaders.get('host') || 'localhost:3000';
+  const proto = reqHeaders.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+  const loginUrl = `${proto}://${host}/login`;
+
+  // Send approval email via Resend
+  if (internEmail) {
+    await sendEmailWithRetry(
+      internEmail,
+      'Welcome to Makerspace — Your Intern Registration is Approved!',
+      `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; max-width: 560px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px;">
+        <h2 style="color: #1B3251; margin-top: 0; font-size: 20px;">Welcome to Makerspace InnovHub!</h2>
+        <p>Hello <strong>${internName}</strong>,</p>
+        <p>Great news! Your registration request for <strong>${school}</strong> (Batch ${batch}) has been approved by the administration. You have officially been admitted to the cohort.</p>
+        <p>You can now sign in to your cohort dashboard using the email address and password you specified when you registered.</p>
+        <div style="margin: 28px 0;">
+          <a href="${loginUrl}" style="background-color: #1B3251; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Sign In to InternDocs</a>
+        </div>
+        <p style="font-size: 12px; color: #64748b; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+          Makerspace InnovHub Cohort Administration
+        </p>
+      </div>
+      `
+    );
+  }
+
+  // Record audit log
+  const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
+  await adminClient.from('audit_log').insert({
+    actor_id: currentUser.id,
+    action: 'INTERN_REGISTRATION_APPROVED',
+    target_id: targetUserId,
+    target_type: 'users',
+    source_ip: ip,
+    payload: {
+      intern_email: internEmail,
+      intern_name: internName,
+      school,
+      batch,
+    },
   });
 
   return { success: true };

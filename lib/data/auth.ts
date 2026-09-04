@@ -231,7 +231,7 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string;
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     // Log the failed attempt — never log the password in any field
@@ -252,121 +252,162 @@ export async function login(formData: FormData) {
     // but we re-wrap to ensure we never confirm email existence
     return { success: false, error: 'Invalid email or password' };
   }
+
+  // Block login if intern self-registration is still pending administrator approval
+  if (signInData?.user?.user_metadata?.approved === false) {
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error: 'Your registration is pending administrator approval. You will receive an email once admitted to the cohort.',
+      isPendingApproval: true,
+    };
+  }
   
   return { success: true };
 }
 
-export const internRegisterEmailSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .email('Please enter a valid email address.')
-    .max(255),
-});
+export const internSelfRegistrationSchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'Please enter your full name.')
+      .max(100, 'Name cannot exceed 100 characters.'),
+    email: z
+      .string()
+      .trim()
+      .email('Please enter a valid email address.')
+      .max(255),
+    password: z
+      .string()
+      .min(12, 'Password must be at least 12 characters long.')
+      .max(128),
+    confirmPassword: z.string(),
+    school: z
+      .string()
+      .trim()
+      .min(2, 'Please enter your school or university.')
+      .max(200, 'School name cannot exceed 200 characters.'),
+    batch: z
+      .string()
+      .trim()
+      .regex(/^\d+$/, 'Batch number must contain numbers only.')
+      .min(1, 'Please enter a batch number.')
+      .max(20, 'Batch number cannot exceed 20 digits.'),
+    start: z.string().date('Please select a valid start date.'),
+    end: z.string().date('Please select a valid end date.'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match.',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => new Date(data.end) > new Date(data.start), {
+    message: 'OJT End date must be after start date.',
+    path: ['end'],
+  })
+  .refine(
+    (data) => {
+      const start = new Date(data.start);
+      const end = new Date(data.end);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 365;
+    },
+    {
+      message: 'OJT duration cannot exceed 12 months.',
+      path: ['end'],
+    }
+  );
 
-export type InternRegisterEmailInput = z.infer<typeof internRegisterEmailSchema>;
+export type InternSelfRegistrationInput = z.infer<typeof internSelfRegistrationSchema>;
 
-export async function registerIntern(emailOrFormData: string | FormData) {
-  const rawEmail =
-    typeof emailOrFormData === 'string'
-      ? emailOrFormData
-      : ((emailOrFormData.get('email') as string) || '');
+export async function registerInternWithPassword(formData: FormData) {
+  const fullName =
+    (formData.get('fullName') as string) || (formData.get('name') as string) || '';
+  const email = (formData.get('email') as string) || '';
+  const password = (formData.get('password') as string) || '';
+  const confirmPassword = (formData.get('confirmPassword') as string) || '';
+  const school = (formData.get('school') as string) || '';
+  const batch = (formData.get('batch') as string) || '';
+  const start = (formData.get('start') as string) || '';
+  const end = (formData.get('end') as string) || '';
 
-  const parsed = internRegisterEmailSchema.safeParse({ email: rawEmail });
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || 'Invalid email address.' };
-  }
-
-  const email = parsed.data.email.toLowerCase();
-  const adminClient = createAdminClient();
-
-  // 1. Check if user already exists in public.users
-  const { data: existingDbUser } = await adminClient
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle();
-
-  if (existingDbUser) {
-    return { success: false, error: 'An account with this email already exists. Please sign in.' };
-  }
-
-  const acceptInviteUrl = await getAcceptInviteUrl();
-  let userId: string;
-  let inviteLink: string | null = null;
-
-  // 2. Try standard inviteUserByEmail
-  const { data: invitedUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    redirectTo: acceptInviteUrl,
+  const parsed = internSelfRegistrationSchema.safeParse({
+    fullName,
+    email,
+    password,
+    confirmPassword,
+    school,
+    batch,
+    start,
+    end,
   });
 
-  if (invitedUser?.user) {
-    userId = invitedUser.user.id;
-  } else {
-    // 3. Fallback: generate invite link directly
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: {
-        redirectTo: acceptInviteUrl,
-      },
-    });
-
-    if (linkData?.user) {
-      userId = linkData.user.id;
-      inviteLink = linkData.properties?.action_link || null;
-    } else {
-      // 4. Fallback: Lookup existing auth user
-      const { data: listData } = await adminClient.auth.admin.listUsers();
-      const existingAuth = listData?.users?.find((u) => u.email?.toLowerCase() === email);
-      if (existingAuth) {
-        userId = existingAuth.id;
-        const { data: magicLinkData } = await adminClient.auth.admin.generateLink({
-          type: 'magiclink',
-          email,
-          options: { redirectTo: acceptInviteUrl },
-        });
-        inviteLink = magicLinkData?.properties?.action_link || null;
-      } else {
-        throw new Error(`Failed to generate activation link: ${inviteError?.message || linkError?.message}`);
-      }
-    }
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message || 'Invalid registration details.',
+    };
   }
 
-  // 4. Upsert user profile into public.users with strict role: 'intern'
+  const normalizedEmail = parsed.data.email.toLowerCase();
+  const adminClient = createAdminClient();
+
+  // 1. Check if user already exists
+  const { data: existingUser } = await adminClient
+    .from('users')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (existingUser) {
+    return {
+      success: false,
+      error: 'An account with this email already exists or is pending approval.',
+    };
+  }
+
+  // 2. Create user identity in auth.users with password, set approved: false
+  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+    email: normalizedEmail,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: parsed.data.fullName,
+      school: parsed.data.school,
+      batch: parsed.data.batch,
+      internship_start: parsed.data.start,
+      internship_end: parsed.data.end,
+      approved: false,
+    },
+  });
+
+  if (authError || !authData.user) {
+    return {
+      success: false,
+      error: authError?.message || 'Failed to submit registration request.',
+    };
+  }
+
+  const userId = authData.user.id;
+
+  // 3. Upsert user in public.users with role: 'intern'
   const { error: profileError } = await adminClient.from('users').upsert({
     id: userId,
-    email,
+    email: normalizedEmail,
     role: 'intern',
+    full_name: parsed.data.fullName,
+    school: parsed.data.school,
+    batch: parsed.data.batch,
+    internship_start: parsed.data.start,
+    internship_end: parsed.data.end,
   });
 
   if (profileError) {
-    console.error('[registerIntern] profile creation error:', profileError.message);
+    console.error('[registerInternWithPassword] profile creation error:', profileError.message);
   }
 
-  // 5. Send email with setup link via Resend (if inviteLink available)
-  if (inviteLink) {
-    try {
-      await sendEmailWithRetry(
-        email,
-        'Welcome to InternDocs — Complete Your Registration',
-        `
-        <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
-          <h2>Welcome to InternDocs!</h2>
-          <p>You requested to register as an intern. Click the button below to set up your password and begin your onboarding:</p>
-          <p style="margin: 25px 0;">
-            <a href="${inviteLink}" style="background-color: #1B3251; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Set Up Password</a>
-          </p>
-          <p style="font-size: 12px; color: #64748b;">If you did not request this registration, you can safely ignore this email.</p>
-        </div>
-        `
-      );
-    } catch (mailErr) {
-      console.warn('[registerIntern] notification email warning:', mailErr);
-    }
-  }
-
-  // 6. Record append-only audit log
+  // 4. Record append-only audit event
   const reqHeaders = await headers();
   const ip = reqHeaders.get('x-forwarded-for') || 'unknown';
 
@@ -376,9 +417,21 @@ export async function registerIntern(emailOrFormData: string | FormData) {
     target_id: userId,
     target_type: 'users',
     source_ip: ip,
-    payload: { email },
+    payload: {
+      full_name: parsed.data.fullName,
+      email: normalizedEmail,
+      school: parsed.data.school,
+      batch: parsed.data.batch,
+      internship_start: parsed.data.start,
+      internship_end: parsed.data.end,
+      approved: false,
+    },
   });
 
-  return { success: true, email };
+  return {
+    success: true,
+    name: parsed.data.fullName,
+    email: normalizedEmail,
+  };
 }
 

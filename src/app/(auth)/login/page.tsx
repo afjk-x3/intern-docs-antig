@@ -22,9 +22,15 @@ export default async function LoginPage({
     let isSuccess = false;
     try {
       const result = await login(formData);
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) {
+        if (result.isPendingApproval) {
+          redirect('/login?reason=pending_approval');
+        }
+        throw new Error(result.error);
+      }
       isSuccess = true;
     } catch (e: unknown) {
+      if (e instanceof Error && e.message === 'NEXT_REDIRECT') throw e;
       const msg = e instanceof Error ? e.message : 'Login failed';
       redirect(`/login?error=${encodeURIComponent(msg)}`);
     }
