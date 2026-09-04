@@ -113,11 +113,14 @@ export async function inviteUser(email: string, role: string, school?: string, b
     }
   }
 
-  // 4. Upsert user record in public.users
+  // 4. Upsert user record in public.users. approved_at is stamped now because an
+  // admin-invited user was admitted by the act of inviting them -- only self-registrations
+  // (registerInternWithPassword) start pending. See migration 20240101000022.
   const { error: insertError } = await adminClient.from('users').upsert({
     id: userId,
     email: parsed.email,
     role: parsed.role,
+    approved_at: new Date().toISOString(),
     ...(parsed.role === 'intern' ? { school: parsed.school || null, batch: parsed.batch || null } : {}),
   });
 
@@ -416,7 +419,10 @@ export async function registerInternWithPassword(formData: FormData) {
 
   const userId = authData.user.id;
 
-  // 3. Upsert user in public.users with role: 'intern'
+  // 3. Upsert user in public.users with role: 'intern'. approved_at stays NULL: this is a
+  // self-registration awaiting an admin, and that NULL is what puts the account in the
+  // Pending Approval list on /admin/users (migration 20240101000022). It is the same state
+  // the approved:false metadata above represents for login().
   const { error: profileError } = await adminClient.from('users').upsert({
     id: userId,
     email: normalizedEmail,
@@ -426,6 +432,7 @@ export async function registerInternWithPassword(formData: FormData) {
     batch: parsed.data.batch,
     internship_start: parsed.data.start,
     internship_end: parsed.data.end,
+    approved_at: null,
   });
 
   if (profileError) {

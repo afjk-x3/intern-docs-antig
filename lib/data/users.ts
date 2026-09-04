@@ -356,6 +356,19 @@ export async function approveInternRegistration(targetUserId: string) {
     throw new Error(`Failed to update approval status: ${updateMetaError.message}`);
   }
 
+  // Stamp the domain row too -- this is what /admin/users reads (getAllInternUsers). The
+  // metadata above is what login() checks off the session; both are set here so they can't
+  // drift. Written after the metadata call so a failed approval can't leave the account
+  // admitted in the table while still blocked at login.
+  const { error: approvedAtError } = await adminClient
+    .from('users')
+    .update({ approved_at: new Date().toISOString() })
+    .eq('id', targetUserId);
+
+  if (approvedAtError) {
+    throw new Error(`Failed to record approval: ${approvedAtError.message}`);
+  }
+
   // Fetch user profile from public.users
   const { data: profile } = await adminClient
     .from('users')
@@ -431,31 +444,26 @@ export interface CohortUser {
  * Every intern account -- both admitted cohort members and self-registered accounts still
  * awaiting admin approval -- in one list, for the /admin/users table.
  *
- * "Pending" isn't a public.users column: registerInternWithPassword (lib/data/auth.ts)
- * creates the auth.users identity immediately with user_metadata.approved = false, and
- * approveInternRegistration flips it to true. An admin-invited intern (inviteUser) never
- * gets that key set at all, so its absence here is treated the same as approved -- an
- * invited intern was never meant to sit in a pending state.
+ * Approval is read from public.users.approved_at (migration 20240101000022), not from
+ * auth metadata. It used to be resolved through supabase.auth.admin.listUsers(), which
+ * returns "Database error finding users" on the production project: the call yielded no
+ * rows, every id missed the lookup, and the "unknown means approved" fallback rendered
+ * pending registrations as admitted cohort members with no Approve action -- leaving those
+ * interns blocked at login and invisible to the admin meant to admit them.
  *
- * perPage is set high enough for realistic cohort sizes (FR-20 sizes the dashboard for
- * ~100 interns) since every id from the public.users query below needs a metadata lookup
- * and Supabase's listUsers() defaults to a 50-row page.
+ * A NULL approved_at means pending. Admin-invited interns (inviteUser) are stamped at
+ * invite time, so they are admitted immediately, as before.
  */
 export async function getAllInternUsers(): Promise<CohortUser[]> {
   const adminClient = createAdminClient();
 
   const { data: dbUsers, error } = await adminClient
     .from('users')
-    .select('id, email, full_name, school, batch, internship_start, internship_end, created_at')
+    .select('id, email, full_name, school, batch, internship_start, internship_end, created_at, approved_at')
     .eq('role', 'intern')
     .order('created_at', { ascending: false });
 
   if (error || !dbUsers) return [];
-
-  const { data: listData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  const approvedMap = new Map(
-    (listData?.users || []).map((u) => [u.id, u.user_metadata?.approved])
-  );
 
   const users: CohortUser[] = dbUsers.map((u) => ({
     id: u.id,
@@ -465,7 +473,7 @@ export async function getAllInternUsers(): Promise<CohortUser[]> {
     batch: u.batch,
     internshipStart: u.internship_start,
     internshipEnd: u.internship_end,
-    status: approvedMap.get(u.id) === false ? 'pending' : 'active',
+    status: u.approved_at ? 'active' : 'pending',
     createdAt: u.created_at,
   }));
 

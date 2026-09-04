@@ -10,6 +10,10 @@ const mockAdminCreateUser = vi.fn();
 const mockAdminGetUserById = vi.fn();
 const mockAdminUpdateUserById = vi.fn();
 const mockUsersUpsert = vi.fn();
+// approveInternRegistration stamps public.users.approved_at as well as the auth metadata
+// (migration 20240101000022), so the users-table mock needs update().eq() too.
+const mockUsersUpdateEq = vi.fn().mockResolvedValue({ error: null });
+const mockUsersUpdate = vi.fn(() => ({ eq: mockUsersUpdateEq }));
 const mockAuditInsert = vi.fn();
 const mockGetUser = vi.fn();
 const mockSignOut = vi.fn();
@@ -48,6 +52,7 @@ vi.mock('../lib/supabase/admin', () => ({
             }),
           }),
           upsert: mockUsersUpsert,
+          update: mockUsersUpdate,
         };
       }
       if (table === 'audit_log') {
@@ -219,7 +224,9 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
         })
       );
 
-      // Verify profile upsert with role: 'intern'
+      // Verify profile upsert with role: 'intern'. approved_at must be null -- that NULL is
+      // what puts the account in the Pending Approval list on /admin/users, and an
+      // admin-invited user (inviteUser) is stamped instead so it starts admitted.
       expect(mockUsersUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'pending-intern-id',
@@ -228,6 +235,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
           full_name: 'Juan dela Cruz',
           school: 'University of the Philippines',
           batch: '5',
+          approved_at: null,
         })
       );
 
@@ -311,6 +319,14 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
           }),
         })
       );
+
+      // Verify approved_at stamped on the domain row. This is what /admin/users reads:
+      // when approval lived only in auth metadata, a failed listUsers() lookup rendered
+      // pending accounts as admitted with no Approve action.
+      expect(mockUsersUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ approved_at: expect.any(String) })
+      );
+      expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'target-intern-id');
 
       // Verify Resend email dispatched
       expect(mockSendEmailWithRetry).toHaveBeenCalledWith(
