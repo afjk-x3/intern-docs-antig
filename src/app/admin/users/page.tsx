@@ -1,14 +1,14 @@
 import { inviteUser } from '@lib/data/auth';
-import { getInternGroupOptions, getPendingRegistrations, approveInternRegistration } from '@lib/data/users';
+import { getInternGroupOptions, getAllInternUsers, approveInternRegistration } from '@lib/data/users';
 import { AdminInviteForm } from '@/components/AdminInviteForm';
-import { PendingRegistrationsModal } from '@/components/PendingRegistrationsModal';
+import { AdminUsersTable } from '@/components/AdminUsersTable';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage() {
-  const [{ schools, batches }, pendingRegistrations] = await Promise.all([
+  const [{ schools, batches }, internUsers] = await Promise.all([
     getInternGroupOptions(),
-    getPendingRegistrations(),
+    getAllInternUsers(),
   ]);
 
   async function handleInvite(formData: FormData) {
@@ -39,19 +39,11 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="p-6 md:p-10 space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Users</h1>
-          <p className="text-sm text-text-muted mt-1">
-            Manage cohort admissions and invite new interns to Makerspace.
-          </p>
-        </div>
-
-        {/* Floating Modal trigger for Pending Registrations */}
-        <PendingRegistrationsModal
-          initialRegistrations={pendingRegistrations}
-          onApproveAction={handleApproveRegistration}
-        />
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">Users</h1>
+        <p className="text-sm text-text-muted mt-1">
+          Manage cohort admissions and invite new interns to Makerspace.
+        </p>
       </div>
 
       {/* Manual Invite Form restricted to Intern role */}
@@ -61,6 +53,9 @@ export default async function AdminUsersPage() {
         existingSchools={schools}
         existingBatches={batches}
       />
+
+      {/* Full cohort: admitted interns and self-registered accounts awaiting approval */}
+      <AdminUsersTable users={internUsers} onApproveAction={handleApproveRegistration} />
     </div>
   );
 }

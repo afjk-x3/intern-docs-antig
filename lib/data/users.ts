@@ -302,52 +302,6 @@ export async function updateUserRole(userId: string, newRole: string) {
   return { success: true };
 }
 
-export interface PendingRegistration {
-  id: string;
-  email: string;
-  fullName: string;
-  school: string;
-  batch: string;
-  internshipStart: string;
-  internshipEnd: string;
-  createdAt: string;
-}
-
-export async function getPendingRegistrations(): Promise<PendingRegistration[]> {
-  const adminClient = createAdminClient();
-  const { data: listData, error } = await adminClient.auth.admin.listUsers();
-  if (error || !listData?.users) return [];
-
-  // Filter users with approved === false
-  const pendingAuthUsers = listData.users.filter(
-    (u) => u.user_metadata?.approved === false
-  );
-
-  if (pendingAuthUsers.length === 0) return [];
-
-  const pendingIds = pendingAuthUsers.map((u) => u.id);
-  const { data: dbUsers } = await adminClient
-    .from('users')
-    .select('id, email, full_name, school, batch, internship_start, internship_end, created_at')
-    .in('id', pendingIds);
-
-  const dbMap = new Map((dbUsers || []).map((u) => [u.id, u]));
-
-  return pendingAuthUsers.map((u) => {
-    const profile = dbMap.get(u.id);
-    return {
-      id: u.id,
-      email: u.email || '',
-      fullName: profile?.full_name || (u.user_metadata?.full_name as string) || 'Unnamed Intern',
-      school: profile?.school || (u.user_metadata?.school as string) || 'N/A',
-      batch: profile?.batch || (u.user_metadata?.batch as string) || 'N/A',
-      internshipStart: profile?.internship_start || (u.user_metadata?.internship_start as string) || '',
-      internshipEnd: profile?.internship_end || (u.user_metadata?.internship_end as string) || '',
-      createdAt: profile?.created_at || u.created_at,
-    };
-  });
-}
-
 export async function approveInternRegistration(targetUserId: string) {
   const supabase = await createClient();
   const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
@@ -439,4 +393,65 @@ export async function approveInternRegistration(targetUserId: string) {
   });
 
   return { success: true };
+}
+
+export interface CohortUser {
+  id: string;
+  email: string;
+  fullName: string | null;
+  school: string | null;
+  batch: string | null;
+  internshipStart: string | null;
+  internshipEnd: string | null;
+  status: 'active' | 'pending';
+  createdAt: string;
+}
+
+/**
+ * Every intern account -- both admitted cohort members and self-registered accounts still
+ * awaiting admin approval -- in one list, for the /admin/users table.
+ *
+ * "Pending" isn't a public.users column: registerInternWithPassword (lib/data/auth.ts)
+ * creates the auth.users identity immediately with user_metadata.approved = false, and
+ * approveInternRegistration flips it to true. An admin-invited intern (inviteUser) never
+ * gets that key set at all, so its absence here is treated the same as approved -- an
+ * invited intern was never meant to sit in a pending state.
+ *
+ * perPage is set high enough for realistic cohort sizes (FR-20 sizes the dashboard for
+ * ~100 interns) since every id from the public.users query below needs a metadata lookup
+ * and Supabase's listUsers() defaults to a 50-row page.
+ */
+export async function getAllInternUsers(): Promise<CohortUser[]> {
+  const adminClient = createAdminClient();
+
+  const { data: dbUsers, error } = await adminClient
+    .from('users')
+    .select('id, email, full_name, school, batch, internship_start, internship_end, created_at')
+    .eq('role', 'intern')
+    .order('created_at', { ascending: false });
+
+  if (error || !dbUsers) return [];
+
+  const { data: listData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const approvedMap = new Map(
+    (listData?.users || []).map((u) => [u.id, u.user_metadata?.approved])
+  );
+
+  const users: CohortUser[] = dbUsers.map((u) => ({
+    id: u.id,
+    email: u.email,
+    fullName: u.full_name,
+    school: u.school,
+    batch: u.batch,
+    internshipStart: u.internship_start,
+    internshipEnd: u.internship_end,
+    status: approvedMap.get(u.id) === false ? 'pending' : 'active',
+    createdAt: u.created_at,
+  }));
+
+  // Pending admissions surface first -- they're the ones needing action.
+  return users.sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
