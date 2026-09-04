@@ -291,9 +291,9 @@ export const internSelfRegistrationSchema = z
     batch: z
       .string()
       .trim()
-      .regex(/^\d+$/, 'Batch number must contain numbers only.')
-      .min(1, 'Please enter a batch number.')
-      .max(20, 'Batch number cannot exceed 20 digits.'),
+      .regex(/^\d+$/, 'Batch year must contain numbers only.')
+      .min(1, 'Please enter a batch year.')
+      .max(20, 'Batch year cannot exceed 20 digits.'),
     start: z.string().date('Please select a valid start date.'),
     end: z.string().date('Please select a valid end date.'),
   })
