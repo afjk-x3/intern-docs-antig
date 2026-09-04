@@ -250,3 +250,57 @@ Scope decisions made with the user before building:
   and the approver review queue (`ApproverQueue`) all got School/Batch filter dropdowns.
   The regular Admin's Users page (`admin/users`) only has the invite form (no user list),
   so it gained the invite-time fields but no filter UI.
+
+### Fix: retention sweep now deletes signed outputs and superseded versions (FR-22)
+
+**Flagged for extra review per `AGENTS.md` — this changes the 30-day deletion job.**
+
+Found during a full PRD re-verification (2026-09-04). FR-22 requires the job to permanently
+delete "the stored files — **submitted versions and signed outputs**". The implementation
+selected exactly one file per submission:
+
+```js
+const activeVersion = sub.submission_versions?.find(v => !v.is_superseded) || sub.submission_versions?.[0];
+```
+
+and removed only that object. Two categories of bytes were therefore never deleted:
+
+- **Signed PDFs** (`approvals.signed_pdf_url`, written to the same `submissions` bucket in
+  `approveSubmissionSigned`) — the artefacts that actually carry an approver's signature image.
+- **Superseded versions** — every file produced by the return/resubmit loop.
+
+The submission was still set to `PURGED` and audit-logged as `RETENTION_PURGE_EXECUTED`, so
+the audit trail asserted a deletion that had not fully happened. Since DTRs are personal data
+under RA 10173 and the 30-day deletion is a non-negotiable constraint, this was treated as the
+highest-priority open item.
+
+What changed:
+
+- New `purgeSubmissionFiles()` helper in `lib/jobs/retention-sweep.ts` collects **every**
+  undeleted version plus **every** undeleted signed output and removes them in one call.
+- Migration `20240101000021_track_signed_output_deletion.sql` adds `approvals.deleted_at`,
+  the per-approval counterpart of `submission_versions.deleted_at` (migration `...000010`).
+  It serves two purposes: idempotency (so the job does not re-attempt removal of
+  already-deleted signed outputs every day), and FR-23's requirement that an administrator
+  can still see "the deletion timestamp" after the document is gone. The attestation fields
+  (`approver_id`, `step`, `file_hash`, `created_at`) are untouched and no client role has an
+  UPDATE policy on `public.approvals`, so FR-23's immutability guarantee is unaffected.
+- The sweep now also visits already-`PURGED` submissions, purely to sweep up bytes left
+  behind by the old implementation. No state transition is attempted for those (they are
+  already terminal); the audit entry carries `leftover_sweep: true` to distinguish it.
+- The `RETENTION_PURGE_EXECUTED` payload gained `version_hashes`, `versions_deleted`, and
+  `signed_outputs_deleted`. `file_hash` is retained for continuity with entries written
+  before this change.
+
+Transition validation still happens **before** any byte is removed, since deletion cannot be
+undone if the transition turns out to be illegal.
+
+Covered by `__tests__/retention-sweep.test.ts` (6 tests), including the "already-purged
+submission with leftover bytes" shape the old code produced, and an idempotency case
+asserting a fully-deleted submission triggers no storage call at all.
+
+**Note for whoever deploys this:** existing production submissions purged by the old code
+still have orphaned signed PDFs and superseded versions in the `submissions` bucket. The
+first run of the updated job after this migration will sweep them automatically — no manual
+cleanup script is needed — but that first run will delete more objects than a normal day's
+run, which is expected.
