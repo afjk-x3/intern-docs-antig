@@ -128,7 +128,7 @@ describe('Intern Self-Registration, Numeric Batch & Admin Approval', () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0]?.message).toContain('Batch number must contain numbers only');
+          expect(result.error.issues[0]?.message).toContain('Batch year must contain numbers only');
         }
       }
     });

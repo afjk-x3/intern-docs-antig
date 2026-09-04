@@ -19,7 +19,7 @@ Prospective interns register their account directly with all required details up
    - **Password \*** (Required, min 12 characters per `05-security.md`)
    - **Confirm Password \*** (Required, must match password)
    - **School / University \*** (Required)
-   - **Batch Number \*** (Required, **numbers only**, e.g. `5`, `2026`)
+   - **Batch Year \*** (Required, **numbers only**, e.g. `2026`)
    - **Start of OJT \*** (Required date)
    - **End of OJT \*** (Required date, must be after start and $\le 365$ days)
 2. **Pending Approval Floating Modal (`/register`)**:
@@ -83,7 +83,7 @@ sequenceDiagram
   * **Password (`password`)**: Min 12 characters with show/hide eye toggle.
   * **Confirm Password (`confirmPassword`)**: Must match password with show/hide toggle.
   * **School / University (`school`)**: Min 2, max 200 characters.
-  * **Batch Number (`batch`)**: **Strictly numeric digits only** (`/^\d+$/`, `type="number"`, `inputMode="numeric"`, `min="1"`).
+  * **Batch Year (`batch`)**: **Strictly numeric digits only** (`/^\d+$/`, `type="number"`, `inputMode="numeric"`, `min="1"`).
   * **Start of OJT (`start`)**: Valid ISO date.
   * **End of OJT (`end`)**: Valid ISO date > `start`, max 12-month span.
 * **Success Modal (Floating)**:
