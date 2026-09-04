@@ -134,11 +134,8 @@ export function AdminRequirementManager({
   return (
     <div className="space-y-6">
       {/* Action Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">Requirement Definitions</h2>
-          <p className="text-xs text-text-muted">Configure document requirements and linked approval workflows.</p>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-text-primary">Requirements</h1>
         <Button onClick={() => setShowReqModal(true)}>+ New Requirement</Button>
       </div>
 

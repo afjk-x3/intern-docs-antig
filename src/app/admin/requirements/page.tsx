@@ -38,11 +38,6 @@ export default async function RequirementsPage() {
 
   return (
     <div className="p-6 md:p-10 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Requirements</h1>
-        <p className="text-sm text-text-muted mt-1">Manage submission requirements and their routing templates.</p>
-      </div>
-
       <AdminRequirementManager
         requirements={requirements}
         routingTemplates={routingTemplates}

@@ -18,11 +18,6 @@ export default async function RoutingTemplatesPage() {
 
   return (
     <div className="p-6 md:p-10 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Routing Templates</h1>
-        <p className="text-sm text-text-muted mt-1">Configure multi-step approval workflows and SLA deadlines.</p>
-      </div>
-      
       <AdminRoutingTemplateManager
         routingTemplates={routingTemplates}
         onCreateTemplate={handleCreateTpl}
