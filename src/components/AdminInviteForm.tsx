@@ -15,6 +15,8 @@ interface AdminInviteFormProps {
   /** Distinct school/batch values already in use, offered as autocomplete suggestions to keep group names consistent. */
   existingSchools?: string[];
   existingBatches?: string[];
+  /** Drops the outer card chrome and the title/description block -- for use inside a Dialog, which already supplies both (see AdminInviteModal). */
+  embedded?: boolean;
 }
 
 export function AdminInviteForm({
@@ -26,6 +28,7 @@ export function AdminInviteForm({
   ],
   existingSchools = [],
   existingBatches = [],
+  embedded = false,
 }: AdminInviteFormProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(allowedRoles[0]?.value || 'intern');
@@ -82,20 +85,22 @@ export function AdminInviteForm({
     }
   };
 
-  return (
-    <div className="bg-surface-bg p-6 rounded-2xl shadow-xs border border-border-default space-y-4 max-w-3xl">
-      <div>
-        <h2 className="text-lg font-bold text-text-primary">
-          {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
-            ? 'Invite Cohort Intern'
-            : 'Invite New User'}
-        </h2>
-        <p className="text-xs text-text-muted mt-0.5">
-          {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
-            ? 'Send an onboarding invitation link to a new intern in the cohort.'
-            : 'Send an onboarding invitation with assigned organizational role.'}
-        </p>
-      </div>
+  const content = (
+    <>
+      {!embedded && (
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
+              ? 'Invite Cohort Intern'
+              : 'Invite New User'}
+          </h2>
+          <p className="text-xs text-text-muted mt-0.5">
+            {allowedRoles.length === 1 && allowedRoles[0]?.value === 'intern'
+              ? 'Send an onboarding invitation link to a new intern in the cohort.'
+              : 'Send an onboarding invitation with assigned organizational role.'}
+          </p>
+        </div>
+      )}
 
       {errorMsg && (
         <div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 border border-rose-200">
@@ -206,6 +211,16 @@ export function AdminInviteForm({
           </Button>
         </div>
       </form>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{content}</div>;
+  }
+
+  return (
+    <div className="bg-surface-bg p-6 rounded-2xl shadow-xs border border-border-default space-y-4 max-w-3xl">
+      {content}
     </div>
   );
 }

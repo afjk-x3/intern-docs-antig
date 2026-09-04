@@ -1,6 +1,6 @@
 import { inviteUser } from '@lib/data/auth';
 import { getInternGroupOptions, getAllInternUsers, approveInternRegistration } from '@lib/data/users';
-import { AdminInviteForm } from '@/components/AdminInviteForm';
+import { AdminInviteModal } from '@/components/AdminInviteModal';
 import { AdminUsersTable } from '@/components/AdminUsersTable';
 
 export const dynamic = 'force-dynamic';
@@ -39,20 +39,23 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="p-6 md:p-10 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Users</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Manage cohort admissions and invite new interns to Makerspace.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Users</h1>
+          <p className="text-sm text-text-muted mt-1">
+            Manage cohort admissions and invite new interns to Makerspace.
+          </p>
+        </div>
 
-      {/* Manual Invite Form restricted to Intern role */}
-      <AdminInviteForm
-        onInviteAction={handleInvite}
-        allowedRoles={[{ value: 'intern', label: 'Intern' }]}
-        existingSchools={schools}
-        existingBatches={batches}
-      />
+        {/* Manual invite, restricted to Intern role -- a fallback now that self-registration
+            is the primary path, so it lives behind a trigger rather than a permanent form. */}
+        <AdminInviteModal
+          onInviteAction={handleInvite}
+          allowedRoles={[{ value: 'intern', label: 'Intern' }]}
+          existingSchools={schools}
+          existingBatches={batches}
+        />
+      </div>
 
       {/* Full cohort: admitted interns and self-registered accounts awaiting approval */}
       <AdminUsersTable users={internUsers} onApproveAction={handleApproveRegistration} />
