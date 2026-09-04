@@ -3,6 +3,7 @@ import { createClient } from '../supabase/server';
 import { createAdminClient } from '../supabase/admin';
 import { z } from 'zod';
 import { headers } from 'next/headers';
+import { logPermissionDenied } from './audit';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -58,6 +59,7 @@ export async function createRequirement(input: z.infer<typeof requirementSchema>
     .single();
 
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'CREATE_REQUIREMENT', targetType: 'requirements' });
     throw new Error('Unauthorized: Only administrators can create requirements.');
   }
 
@@ -110,6 +112,12 @@ export async function updateRequirement(id: string, input: Partial<z.infer<typeo
     .single();
 
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'UPDATE_REQUIREMENT',
+      targetType: 'requirements',
+      targetId: id,
+    });
     throw new Error('Unauthorized');
   }
 
@@ -173,6 +181,12 @@ export async function uploadRequirementTemplate(requirementId: string, formData:
 
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'UPLOAD_REQUIREMENT_TEMPLATE',
+      targetType: 'requirements',
+      targetId: requirementId,
+    });
     throw new Error('Unauthorized: Only administrators can set a requirement template.');
   }
 

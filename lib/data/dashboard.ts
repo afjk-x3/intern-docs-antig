@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '../supabase/admin';
 import { createClient } from '../supabase/server';
+import { logPermissionDenied } from './audit';
 
 export interface DashboardIntern {
   id: string;
@@ -48,6 +49,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'READ_ADMIN_DASHBOARD', targetType: 'submissions' });
     throw new Error('Unauthorized');
   }
 

@@ -1,4 +1,7 @@
-import { AuditLogTable, AuditLogEntry } from '@/components/AuditLogTable';
+import { AuditLogTable } from '@/components/AuditLogTable';
+// AuditLogEntry lives in lib/data/audit -- AuditLogTable only consumes it, it does not
+// re-export it. Matches src/app/system-admin/audit-log/page.tsx.
+import { AuditLogEntry } from '@lib/data/audit';
 import { createAdminClient } from '@lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';

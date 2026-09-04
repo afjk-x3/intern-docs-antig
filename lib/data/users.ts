@@ -4,6 +4,7 @@ import { createAdminClient } from '../supabase/admin';
 import { z } from 'zod';
 import { headers } from 'next/headers';
 import { sendEmailWithRetry } from '../email/resend';
+import { logPermissionDenied } from './audit';
 
 const datesSchema = z.object({
   start: z.string().date(),
@@ -174,6 +175,12 @@ export async function updateInternshipDatesAsAdmin(targetUserId: string, start: 
 
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({
+      actorId: user.id,
+      attempted: 'ADMIN_UPDATE_INTERNSHIP_DATES',
+      targetType: 'users',
+      targetId: targetUserId,
+    });
     throw new Error('Unauthorized: Only administrators can change another user\'s internship dates.');
   }
 
@@ -239,6 +246,12 @@ export async function updateUserGroup(userId: string, school: string, batch: str
     .single();
 
   if (roleError || !['admin', 'system_admin'].includes(currentDbUser?.role)) {
+    await logPermissionDenied({
+      actorId: currentUser.id,
+      attempted: 'UPDATE_GROUP',
+      targetType: 'users',
+      targetId: userId,
+    });
     throw new Error('Unauthorized');
   }
 
@@ -277,6 +290,13 @@ export async function updateUserRole(userId: string, newRole: string) {
     .single();
 
   if (roleError || !['admin', 'system_admin'].includes(currentDbUser?.role)) {
+    await logPermissionDenied({
+      actorId: currentUser.id,
+      attempted: 'UPDATE_ROLE',
+      targetType: 'users',
+      targetId: userId,
+      reason: `attempted to set role '${newRole}'`,
+    });
     throw new Error('Unauthorized');
   }
 

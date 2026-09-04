@@ -3,6 +3,7 @@ import { createClient } from '../supabase/server';
 import { createAdminClient } from '../supabase/admin';
 import { z } from 'zod';
 import { headers } from 'next/headers';
+import { logPermissionDenied } from './audit';
 
 const stepSchema = z.object({
   step: z.number().int().min(1).max(2),
@@ -38,6 +39,7 @@ export async function getApproversList() {
   const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
   // FR-2: only approvers/admins need to enumerate other approvers (for the reassignment picker).
   if (!dbUser || !['approver', 'admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'LIST_APPROVERS', targetType: 'users' });
     throw new Error('Unauthorized');
   }
 
@@ -66,6 +68,7 @@ export async function createRoutingTemplate(input: z.infer<typeof routingTemplat
     .single();
 
   if (!dbUser || !['admin', 'system_admin'].includes(dbUser.role)) {
+    await logPermissionDenied({ actorId: user.id, attempted: 'CREATE_ROUTING_TEMPLATE', targetType: 'routing_templates' });
     throw new Error('Unauthorized');
   }
 
