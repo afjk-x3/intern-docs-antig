@@ -16,6 +16,11 @@ interface AdminInviteModalProps {
   allowedRoles?: RoleOption[];
   existingSchools?: string[];
   existingBatches?: string[];
+  /** School/Batch fields only apply to intern invites -- callers that can invite any role set this false (see AdminInviteForm). */
+  showGroupFields?: boolean;
+  triggerLabel?: string;
+  title?: string;
+  description?: React.ReactNode;
 }
 
 /**
@@ -33,6 +38,15 @@ export function AdminInviteModal({
   allowedRoles,
   existingSchools = [],
   existingBatches = [],
+  showGroupFields = true,
+  triggerLabel = 'Invite Intern',
+  title = 'Invite Cohort Intern',
+  description = (
+    <>
+      Manual fallback for interns who can&apos;t use self-registration. Most interns
+      should sign up themselves and be admitted from the Approve action in the table below.
+    </>
+  ),
 }: AdminInviteModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
@@ -55,16 +69,13 @@ export function AdminInviteModal({
         <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
         </svg>
-        <span>Invite Intern</span>
+        <span>{triggerLabel}</span>
       </button>
 
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Invite Cohort Intern</DialogTitle>
-          <DialogDescription>
-            Manual fallback for interns who can&apos;t use self-registration. Most interns
-            should sign up themselves and be admitted from the Approve action in the table below.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <AdminInviteForm
@@ -72,6 +83,7 @@ export function AdminInviteModal({
           allowedRoles={allowedRoles}
           existingSchools={existingSchools}
           existingBatches={existingBatches}
+          showGroupFields={showGroupFields}
           embedded
         />
       </DialogContent>

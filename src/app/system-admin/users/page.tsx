@@ -1,6 +1,6 @@
 import { inviteUser } from '@lib/data/auth';
-import { updateUserRole, updateUserGroup, updateInternshipDatesAsAdmin, getInternGroupOptions } from '@lib/data/users';
-import { AdminInviteForm } from '@/components/AdminInviteForm';
+import { updateUserRole, updateUserGroup, updateInternshipDatesAsAdmin } from '@lib/data/users';
+import { AdminInviteModal } from '@/components/AdminInviteModal';
 import { UserManagementTable } from '@/components/UserManagementTable';
 import { createAdminClient } from '@lib/supabase/admin';
 
@@ -8,13 +8,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function SystemAdminUsersPage() {
   const adminClient = createAdminClient();
-  const [{ data: users }, { schools, batches }] = await Promise.all([
-    adminClient
-      .from('users')
-      .select('id, email, role, internship_start, internship_end, school, batch, created_at')
-      .order('created_at', { ascending: false }),
-    getInternGroupOptions(),
-  ]);
+  const { data: users } = await adminClient
+    .from('users')
+    .select('id, email, role, internship_start, internship_end, school, batch, created_at')
+    .order('created_at', { ascending: false });
 
   async function handleInvite(formData: FormData) {
     'use server';
@@ -64,25 +61,29 @@ export default async function SystemAdminUsersPage() {
 
   return (
     <div className="p-6 md:p-10 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">User &amp; Role Management</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Invite members, control role-based access control (RBAC), and manage system permissions.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">User &amp; Role Management</h1>
+          <p className="text-sm text-text-muted mt-1">
+            Invite members, control role-based access control (RBAC), and manage system permissions.
+          </p>
+        </div>
 
-      {/* Invite Form with all role capabilities */}
-      <AdminInviteForm
-        onInviteAction={handleInvite}
-        allowedRoles={[
-          { value: 'intern', label: 'Intern' },
-          { value: 'approver', label: 'Approver' },
-          { value: 'admin', label: 'Admin' },
-          { value: 'system_admin', label: 'System Admin' },
-        ]}
-        existingSchools={schools}
-        existingBatches={batches}
-      />
+        {/* System admins can invite any role, so the form skips the intern-only School/Batch fields. */}
+        <AdminInviteModal
+          onInviteAction={handleInvite}
+          allowedRoles={[
+            { value: 'intern', label: 'Intern' },
+            { value: 'approver', label: 'Approver' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'system_admin', label: 'System Admin' },
+          ]}
+          showGroupFields={false}
+          triggerLabel="Invite User"
+          title="Invite New User"
+          description="Send an onboarding invitation with an assigned organizational role."
+        />
+      </div>
 
       {/* Filterable Users Table */}
       <UserManagementTable

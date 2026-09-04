@@ -17,6 +17,8 @@ interface AdminInviteFormProps {
   existingBatches?: string[];
   /** Drops the outer card chrome and the title/description block -- for use inside a Dialog, which already supplies both (see AdminInviteModal). */
   embedded?: boolean;
+  /** School/Batch only make sense when inviting interns into a cohort group. Callers that can invite any role (e.g. system_admin, who isn't grouped) set this false to keep the form to email + role. */
+  showGroupFields?: boolean;
 }
 
 export function AdminInviteForm({
@@ -29,6 +31,7 @@ export function AdminInviteForm({
   existingSchools = [],
   existingBatches = [],
   embedded = false,
+  showGroupFields = true,
 }: AdminInviteFormProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(allowedRoles[0]?.value || 'intern');
@@ -41,6 +44,7 @@ export function AdminInviteForm({
 
   const targetRole = allowedRoles.length === 1 ? allowedRoles[0].value : role;
   const isInternInvite = targetRole === 'intern';
+  const includeGroupFields = showGroupFields && isInternInvite;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +55,7 @@ export function AdminInviteForm({
     const formData = new FormData();
     formData.set('email', email);
     formData.set('role', targetRole);
-    if (isInternInvite) {
+    if (includeGroupFields) {
       formData.set('school', school.trim());
       formData.set('batch', batch.trim());
     }
@@ -171,7 +175,7 @@ export function AdminInviteForm({
             ))}
           </select>
         </div>
-        {isInternInvite && (
+        {includeGroupFields && (
           <>
             <div>
               <label htmlFor="invite-school" className="block text-xs font-semibold text-text-primary mb-1">School <span className="font-normal text-text-muted">(optional)</span></label>

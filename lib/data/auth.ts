@@ -63,7 +63,10 @@ export async function inviteUser(email: string, role: string, school?: string, b
     throw new Error('Forbidden: Administrators can only invite interns. Inviting staff roles requires System Administrator privileges.');
   }
 
-  const parsed = inviteSchema.parse({ email, role, school, batch });
+  // FormData.get() returns null (not undefined) for an absent field -- e.g. school/batch
+  // when the caller's form omits them for non-intern roles -- which z.string().optional()
+  // rejects. Normalize both to undefined so the schema's .optional() actually applies.
+  const parsed = inviteSchema.parse({ email, role, school: school || undefined, batch: batch || undefined });
   const adminClient = createAdminClient();
   const acceptInviteUrl = await getAcceptInviteUrl();
 
