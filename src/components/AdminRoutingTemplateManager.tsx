@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Workflow, Clock } from 'lucide-react';
 import type { CreateRoutingTemplateInput } from './AdminRequirementManager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -73,22 +74,30 @@ export function AdminRoutingTemplateManager({
         {routingTemplates.map((tpl) => (
           <div
             key={tpl.id}
-            className="bg-surface-bg border border-border-default rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4"
+            className="bg-surface-bg border border-border-default rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-border-strong hover:shadow-sm transition-all"
           >
             <div>
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-bold text-sm text-text-primary">{tpl.name}</h3>
-                <span className="text-[11px] font-semibold text-brand-primary bg-brand-muted px-2.5 py-0.5 rounded-full border border-border-default">
-                  {tpl.sla_days ? `${tpl.sla_days}-day SLA` : 'No SLA target'}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-brand-muted text-brand-primary">
+                    <Workflow className="h-4.5 w-4.5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm text-text-primary truncate">{tpl.name}</h3>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {(tpl.steps || []).length} Sequential {(tpl.steps || []).length === 1 ? 'Step' : 'Steps'}
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-brand-primary bg-brand-muted px-2.5 py-1 rounded-full border border-border-default whitespace-nowrap">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {tpl.sla_days ? `${tpl.sla_days}d SLA` : 'No SLA'}
                 </span>
               </div>
-              <p className="text-xs text-text-muted mt-1">
-                {(tpl.steps || []).length} Sequential {(tpl.steps || []).length === 1 ? 'Step' : 'Steps'}
-              </p>
             </div>
 
             {/* Step visualization */}
-            <div className="space-y-2 border-t border-border-default pt-3">
+            <div className="space-y-2 border-t border-border-default pt-3.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Approval Chain
               </span>
@@ -115,8 +124,11 @@ export function AdminRoutingTemplateManager({
         ))}
 
         {routingTemplates.length === 0 && (
-          <div className="col-span-full p-8 text-center bg-surface-bg border border-border-default rounded-2xl text-xs text-text-muted">
-            No custom routing templates configured yet. Click &quot;+ New Routing Template&quot; above to create one.
+          <div className="col-span-full py-10 text-center text-text-muted bg-surface-bg border border-border-default rounded-2xl">
+            <div className="space-y-1">
+              <p className="font-semibold text-text-primary text-sm">No routing templates configured yet</p>
+              <p className="text-xs">Click &quot;+ New Routing Template&quot; above to create one.</p>
+            </div>
           </div>
         )}
       </div>

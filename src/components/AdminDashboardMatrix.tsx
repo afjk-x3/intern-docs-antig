@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { CheckCircle2, Clock, AlertTriangle, Undo2, Download, LayoutGrid } from 'lucide-react';
 import { AdminDashboardData } from '@lib/data/dashboard';
 import { StatusBadge } from './StatusBadge';
 import { Button } from './ui/button';
@@ -151,40 +152,77 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
 
   const chipFilter = (state: string) => setFilterState(prev => (prev === state ? 'ALL' : state));
 
+  const STAT_CARDS = [
+    {
+      key: 'APPROVED', label: 'Complete', count: summaryCounts.complete, Icon: CheckCircle2,
+      iconIdle: 'bg-emerald-50 text-emerald-600', iconActive: 'bg-emerald-600 text-white',
+      ring: 'ring-emerald-500',
+    },
+    {
+      key: 'IN_REVIEW', label: 'In Review', count: summaryCounts.inReview, Icon: Clock,
+      iconIdle: 'bg-amber-50 text-amber-600', iconActive: 'bg-amber-600 text-white',
+      ring: 'ring-amber-500',
+    },
+    {
+      key: 'OVERDUE', label: 'Overdue', count: summaryCounts.overdue, Icon: AlertTriangle,
+      iconIdle: 'bg-red-50 text-red-600', iconActive: 'bg-red-600 text-white',
+      ring: 'ring-red-500',
+    },
+    {
+      key: 'RETURNED', label: 'Returned', count: summaryCounts.returned, Icon: Undo2,
+      iconIdle: 'bg-rose-50 text-rose-600', iconActive: 'bg-rose-600 text-white',
+      ring: 'ring-rose-500',
+    },
+  ] as const;
+
+  const selectClass =
+    'w-full text-xs p-2.5 rounded-xl border border-border-default bg-white text-text-primary focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all';
+
   return (
     <div className="space-y-6">
-      {/* Summary Count Chips */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { key: 'APPROVED', label: 'Complete', count: summaryCounts.complete, active: 'bg-emerald-600 text-white', idle: 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100' },
-          { key: 'IN_REVIEW', label: 'In Review', count: summaryCounts.inReview, active: 'bg-amber-600 text-white', idle: 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' },
-          { key: 'OVERDUE', label: 'Overdue', count: summaryCounts.overdue, active: 'bg-red-600 text-white', idle: 'bg-red-50 text-red-800 border border-red-200 hover:bg-red-100' },
-          { key: 'RETURNED', label: 'Returned', count: summaryCounts.returned, active: 'bg-rose-600 text-white', idle: 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100' },
-        ].map(chip => (
-          <button
-            key={chip.key}
-            type="button"
-            onClick={() => chipFilter(chip.key)}
-            aria-pressed={filterState === chip.key}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${filterState === chip.key ? chip.active : chip.idle}`}
-          >
-            {chip.label}: {chip.count}
-          </button>
-        ))}
+      {/* Summary stat cards -- click to toggle as a state filter, same as the old chip row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {STAT_CARDS.map(({ key, label, count, Icon, iconIdle, iconActive, ring }) => {
+          const active = filterState === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => chipFilter(key)}
+              aria-pressed={active}
+              className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+                active
+                  ? `border-transparent bg-surface-bg shadow-xs ring-2 ${ring}`
+                  : 'border-border-default bg-surface-bg hover:border-border-strong hover:shadow-xs'
+              }`}
+            >
+              <span className={`shrink-0 flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${active ? iconActive : iconIdle}`}>
+                <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xl font-bold text-text-primary leading-tight">{count}</span>
+                <span className="block text-[11px] font-medium text-text-muted truncate">{label}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-between bg-surface-bg p-4 rounded-xl border border-border-default shadow-xs">
-        <div className="flex flex-wrap gap-4 items-center">
+      {/* Filter toolbar */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:items-end justify-between bg-surface-bg p-5 rounded-2xl border border-border-default shadow-xs">
+        <div className="flex flex-wrap gap-3 items-end">
           {/* View mode toggle */}
           <div>
-            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">View</label>
-            <div role="tablist" aria-label="Matrix view mode" className="flex bg-surface-muted rounded-lg p-1 border border-border-default text-xs">
+            <label className="flex items-center gap-1 text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+              <LayoutGrid className="h-3 w-3" aria-hidden="true" /> View
+            </label>
+            <div role="tablist" aria-label="Matrix view mode" className="flex bg-surface-muted rounded-xl p-1 border border-border-default text-xs">
               <button
                 type="button"
                 role="tab"
                 aria-selected={viewMode === 'needs-action'}
                 onClick={() => setViewMode('needs-action')}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors ${viewMode === 'needs-action' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${viewMode === 'needs-action' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'}`}
               >
                 Needs Action
               </button>
@@ -193,7 +231,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
                 role="tab"
                 aria-selected={viewMode === 'full'}
                 onClick={() => setViewMode('full')}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors ${viewMode === 'full' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${viewMode === 'full' ? 'bg-surface-bg text-brand-primary shadow-xs' : 'text-text-muted hover:text-text-primary'}`}
               >
                 Full Grid
               </button>
@@ -201,14 +239,14 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
           </div>
           <div>
             <label htmlFor="filter-requirement" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Requirement</label>
-            <select id="filter-requirement" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterReq} onChange={e => setFilterReq(e.target.value)}>
+            <select id="filter-requirement" className={selectClass} value={filterReq} onChange={e => setFilterReq(e.target.value)}>
               <option value="ALL">All Requirements</option>
               {data.requirements.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
             <label htmlFor="filter-state" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">State</label>
-            <select id="filter-state" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterState} onChange={e => setFilterState(e.target.value)}>
+            <select id="filter-state" className={selectClass} value={filterState} onChange={e => setFilterState(e.target.value)}>
               <option value="ALL">All States</option>
               <option value="NOT_STARTED">Not Started</option>
               <option value="IN_REVIEW">In Review</option>
@@ -219,7 +257,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
           </div>
           <div>
             <label htmlFor="filter-approver" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Approver</label>
-            <select id="filter-approver" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterApprover} onChange={e => setFilterApprover(e.target.value)}>
+            <select id="filter-approver" className={selectClass} value={filterApprover} onChange={e => setFilterApprover(e.target.value)}>
               <option value="ALL">All Approvers</option>
               {approvers.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -227,7 +265,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
           {schools.length > 0 && (
             <div>
               <label htmlFor="filter-school" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">School</label>
-              <select id="filter-school" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
+              <select id="filter-school" className={selectClass} value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
                 <option value="ALL">All Schools</option>
                 {schools.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -236,30 +274,30 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
           {batches.length > 0 && (
             <div>
               <label htmlFor="filter-batch" className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Batch</label>
-              <select id="filter-batch" className="text-xs p-1.5 rounded border border-border-default bg-surface-muted" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
+              <select id="filter-batch" className={selectClass} value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
                 <option value="ALL">All Batches</option>
                 {batches.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
           )}
         </div>
-        <div className="flex items-end">
-          <Button onClick={handleExport} disabled={isExporting} variant="outline">
-            {isExporting ? 'Exporting...' : 'Export CSV'}
-          </Button>
-        </div>
+        <Button onClick={handleExport} disabled={isExporting} variant="outline" className="gap-1.5">
+          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          {isExporting ? 'Exporting...' : 'Export CSV'}
+        </Button>
       </div>
 
-      <div className="bg-surface-bg border border-border-default rounded-xl shadow-xs overflow-hidden">
+      {/* Matrix */}
+      <div className="bg-surface-bg border border-border-default rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Intern requirement completion matrix">
           <table className="w-full text-left text-sm border-collapse">
             <thead className="bg-surface-muted border-b border-border-default text-xs text-text-muted sticky top-0 z-20 shadow-xs">
               <tr>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap min-w-[200px] border-r border-border-default sticky left-0 z-20 bg-surface-muted">
+                <th className="px-4 py-3.5 font-semibold whitespace-nowrap min-w-[200px] border-r border-border-default sticky left-0 z-20 bg-surface-muted">
                   Intern ({filteredInterns.length})
                 </th>
                 {requirementsToRender.map(req => (
-                  <th key={req.id} className="px-4 py-3 font-semibold whitespace-nowrap min-w-[140px] text-center border-r border-border-default last:border-0">
+                  <th key={req.id} className="px-4 py-3.5 font-semibold whitespace-nowrap min-w-[140px] text-center border-r border-border-default last:border-0">
                     <div className="truncate w-full" title={req.name}>{req.name}</div>
                   </th>
                 ))}
@@ -268,7 +306,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
             <tbody className="divide-y divide-border-default">
               {filteredInterns.map(intern => (
                 <tr key={intern.id} className="hover:bg-surface-hover transition-colors align-top">
-                  <td className="px-4 py-3 border-r border-border-default bg-white sticky left-0 z-10 align-top">
+                  <td className="px-4 py-3.5 border-r border-border-default bg-white sticky left-0 z-10 align-top">
                     <div className="font-medium text-text-primary truncate" title={intern.email}>{intern.email}</div>
                     {(intern.school || intern.batch) && (
                       <div className="text-[10px] text-text-muted truncate">
@@ -282,7 +320,7 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
                     const matchesStateFilter =
                       filterState === 'ALL' || (filterState === 'OVERDUE' ? (sub?.isOverdue ?? false) : state === filterState);
                     return (
-                      <td key={req.id} className="px-4 py-3 text-center border-r border-border-default last:border-0 align-top">
+                      <td key={req.id} className="px-4 py-3.5 text-center border-r border-border-default last:border-0 align-top">
                         {matchesStateFilter ? (
                           <div className="flex flex-col items-center justify-center gap-1">
                             {sub?.id ? (
@@ -312,10 +350,17 @@ export function AdminDashboardMatrix({ data }: { data: AdminDashboardData }) {
               ))}
               {filteredInterns.length === 0 && (
                 <tr>
-                  <td colSpan={requirementsToRender.length + 1} className="px-4 py-8 text-center text-text-muted text-sm">
-                    {viewMode === 'needs-action'
-                      ? 'Nothing needs action right now -- switch to Full Grid to see everything.'
-                      : 'No interns match the current filters.'}
+                  <td colSpan={requirementsToRender.length + 1} className="py-10 text-center text-text-muted">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-text-primary text-sm">
+                        {viewMode === 'needs-action' ? 'Nothing needs action right now' : 'No interns found'}
+                      </p>
+                      <p className="text-xs">
+                        {viewMode === 'needs-action'
+                          ? 'Switch to Full Grid to see everything.'
+                          : 'No interns match the current filters.'}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
